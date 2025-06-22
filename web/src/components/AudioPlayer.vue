@@ -144,10 +144,15 @@ export default {
     loadAudio(url) {
       if (!url) return;
       
-      // 使用统一的资源URL处理函数
-      const audioUrl = getResourceUrl(url);
-      
-      this.wavesurfer.load(audioUrl);
+      // 检查是否为Blob URL或者Data URL
+      if (url.startsWith('blob:') || url.startsWith('data:')) {
+        // 对于Blob URL和Data URL，直接使用，不需要处理
+        this.wavesurfer.load(url);
+      } else {
+        // 使用统一的资源URL处理函数处理普通URL
+        const audioUrl = getResourceUrl(url);
+        this.wavesurfer.load(audioUrl);
+      }
     },
     togglePlay() {
       if (this.loading) return;

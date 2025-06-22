@@ -1,8 +1,9 @@
 package com.xiaozhi.service;
 
-import java.util.List;
-
+import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.entity.SysConfig;
+
+import java.util.List;
 
 /**
  * 配置
@@ -15,19 +16,18 @@ public interface SysConfigService {
   /**
    * 添加配置
    * 
-   * @param SysConfig
+   * @param config
    * @return
    */
-  public int add(SysConfig config);
+  int add(SysConfig config);
 
   /**
    * 修改配置
    * 
-   * @param SysConfig
+   * @param config
    * @return
    */
-  public int update(SysConfig config);
-
+  int update(SysConfig config);
 
   /**
    * 查询
@@ -35,7 +35,7 @@ public interface SysConfigService {
    * @param config;
    * @return
    */
-  public List<SysConfig> query(SysConfig config);
+  List<SysConfig> query(SysConfig config, PageFilter pageFilter);
 
   /**
    * 查询配置
@@ -43,5 +43,5 @@ public interface SysConfigService {
    * @param configId;
    * @return
    */
-  public SysConfig selectConfigById(Integer configId);
+  SysConfig selectConfigById(Integer configId);
 }

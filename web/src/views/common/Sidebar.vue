@@ -2,7 +2,7 @@
   <div class="sidebar-haslogo">
     <div class="header-logo">
       <a href="/dashboard" id="logo">
-        <img src="/static/img/logo.png" alt="" style="height: 32px" />
+        <img src="/static/img/logo.png" alt="" />
       </a>
     </div>
     <a-menu
@@ -29,6 +29,8 @@
 import { Menu } from "ant-design-vue";
 import router from "@/router/index.js";
 import mixin from "@/mixins/index";
+import { mapGetters } from 'vuex';
+
 const SubMenu = {
   template: `
       <a-sub-menu :key="menuInfo.path" v-bind="$props" v-on="$listeners">
@@ -36,7 +38,7 @@ const SubMenu = {
           <a-icon :type="menuInfo.meta.icon" />
           <span>{{ menuInfo.meta.title }}</span>
         </span>
-        <template v-for="item in menuInfo.children">
+        <template v-for="item in filterAdminRoutes(menuInfo.children)">
           <a-menu-item v-if="!item.children" :key="item.path">
             <router-link :to="{path: item.path}">
               <span>{{ item.meta.title }}</span>
@@ -55,8 +57,22 @@ const SubMenu = {
       default: () => ({}),
     },
   },
+  computed: {
+    ...mapGetters(['USER_INFO']),
+    isAdmin() {
+      return this.USER_INFO && this.USER_INFO.isAdmin == '1';
+    }
+  },
+  methods: {
+    filterAdminRoutes(routes) {
+      if (!routes) return [];
+      return routes.filter(route => {
+        return !route.meta.isAdmin || (route.meta.isAdmin && this.isAdmin);
+      });
+    }
+  }
 };
-// import Bus from 'static/js/eventBus.js'
+
 export default {
   mixins: [mixin],
   components: {
@@ -71,12 +87,15 @@ export default {
     };
   },
   computed: {
+    ...mapGetters(['USER_INFO']),
+    isAdmin() {
+      return this.USER_INFO && this.USER_INFO.isAdmin == '1';
+    },
     onRoutes() {
       console.log(this.$route.path);
       // 切换页面时摧毁所有弹框
       this.$message.destroy()
       return this.$route.path;
-      // return this.$route.path.replace('/', '')
     },
     filteredSidebar() {
       return this.sidebar.filter(route => {
@@ -86,9 +105,6 @@ export default {
       });
     }
   },
-  watch: {},
-  mounted() {},
-  created() {},
   methods: {
     onOpenChange(openKeys) {
       const latestOpenKey = openKeys.find((key) => this.openKeys.indexOf(key) === -1);

@@ -1,13 +1,11 @@
 package com.xiaozhi.common.interceptor;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ServerWebExchange;
-import org.springframework.web.server.WebFilter;
-import org.springframework.web.server.WebFilterChain;
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.ModelAndView;
 
-import reactor.core.publisher.Mono;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * 系统日志拦截器
@@ -16,20 +14,22 @@ import reactor.core.publisher.Mono;
  * 
  */
 @Component
-public class LogInterceptor implements WebFilter {
+public class LogInterceptor implements HandlerInterceptor {
     
-    private static final Logger logger = LoggerFactory.getLogger(LogInterceptor.class);
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        
+        return true;
+    }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        String path = exchange.getRequest().getURI().getPath();
-        String method = exchange.getRequest().getMethodValue();
-        String remoteAddress = exchange.getRequest().getRemoteAddress() != null ? 
-                exchange.getRequest().getRemoteAddress().getHostString() : "unknown";
+    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
+            ModelAndView modelAndView) throws Exception {
+        // 此方法在处理器执行完成后、视图渲染前调用
+    }
 
-        return chain.filter(exchange)
-                .doFinally(signalType -> {
-                    // logger.info("Response: {} {} - {}", method, path, exchange.getResponse().getStatusCode());
-                });
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex)
+            throws Exception {
     }
 }

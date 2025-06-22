@@ -1,16 +1,15 @@
 package com.xiaozhi.service.impl;
 
-import java.util.List;
-
 import com.github.pagehelper.PageHelper;
+import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.dao.MessageMapper;
 import com.xiaozhi.entity.SysMessage;
 import com.xiaozhi.service.SysMessageService;
-
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.Resource;
+import java.util.List;
 
 /**
  * 聊天记录
@@ -20,7 +19,7 @@ import javax.annotation.Resource;
  */
 
 @Service
-public class SysMessageServiceImpl implements SysMessageService {
+public class SysMessageServiceImpl extends BaseServiceImpl implements SysMessageService {
 
     @Resource
     private MessageMapper messageMapper;
@@ -32,7 +31,7 @@ public class SysMessageServiceImpl implements SysMessageService {
      * @return
      */
     @Override
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public int add(SysMessage message) {
         return messageMapper.add(message);
     }
@@ -44,9 +43,9 @@ public class SysMessageServiceImpl implements SysMessageService {
      * @return
      */
     @Override
-    public List<SysMessage> query(SysMessage message) {
-        if (message.getLimit() != null && message.getLimit() > 0) {
-            PageHelper.startPage(message.getStart(), message.getLimit());
+    public List<SysMessage> query(SysMessage message, PageFilter pageFilter) {
+        if(pageFilter != null){
+            PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
         }
         return messageMapper.query(message);
     }
@@ -58,7 +57,7 @@ public class SysMessageServiceImpl implements SysMessageService {
      * @return
      */
     @Override
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public int delete(SysMessage message) {
         return messageMapper.delete(message);
     }

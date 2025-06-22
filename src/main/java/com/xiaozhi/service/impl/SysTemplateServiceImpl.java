@@ -1,9 +1,9 @@
 package com.xiaozhi.service.impl;
 
-import com.xiaozhi.entity.SysTemplate;
 import com.xiaozhi.dao.TemplateMapper;
+import com.xiaozhi.entity.SysTemplate;
 import com.xiaozhi.service.SysTemplateService;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,14 +15,14 @@ import java.util.List;
 @Service
 public class SysTemplateServiceImpl implements SysTemplateService {
     
-    @Autowired
+    @Resource
     private TemplateMapper templateMapper;
 
     /**
      * 添加模板
      */
     @Override
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public int add(SysTemplate template) {
         // 如果是默认模板，先重置其他默认模板
         if (template.getIsDefault() != null && template.getIsDefault().equals("1")) {
@@ -35,7 +35,7 @@ public class SysTemplateServiceImpl implements SysTemplateService {
      * 修改模板
      */
     @Override
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public int update(SysTemplate template) {
         // 如果是默认模板，先重置其他默认模板
         if (template.getIsDefault() != null && template.getIsDefault().equals("1")) {

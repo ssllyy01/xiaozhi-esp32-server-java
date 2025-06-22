@@ -1,27 +1,20 @@
 package com.xiaozhi.utils;
 
+import com.xiaozhi.entity.SysUser;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.net.*;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.web.server.ServerWebExchange;
-
-import com.xiaozhi.entity.SysUser;
 
 public class CmsUtils {
 
@@ -44,16 +37,21 @@ public class CmsUtils {
         }).start();
     }
 
-    public static SysUser getUser(ServerWebExchange exchange) {
-        return exchange.getAttribute(USER_ATTRIBUTE_KEY);
+    public static SysUser getUser() {
+        Object userObj = RequestContextHolder.currentRequestAttributes().getAttribute(USER_ATTRIBUTE_KEY, RequestAttributes.SCOPE_REQUEST);
+        if (userObj instanceof SysUser) {
+            return (SysUser) userObj;
+        } else {
+            return null;
+        }
     }
 
-    public static void setUser(ServerWebExchange exchange, SysUser user) {
-        exchange.getAttributes().put(USER_ATTRIBUTE_KEY, user);
+    public static void setUser(HttpServletRequest request, SysUser user) {
+        request.setAttribute(USER_ATTRIBUTE_KEY, user);
     }
 
-    public static Integer getUserId(ServerWebExchange exchange) {
-        SysUser user = getUser(exchange);
+    public static Integer getUserId() {
+        SysUser user = getUser();
         if (user != null) {
             return user.getUserId();
         } else {
@@ -61,8 +59,8 @@ public class CmsUtils {
         }
     }
 
-    public static String getUsername(ServerWebExchange exchange) {
-        SysUser user = getUser(exchange);
+    public static String getUsername() {
+        SysUser user = getUser();
         if (user != null) {
             return user.getUsername();
         } else {
@@ -70,8 +68,8 @@ public class CmsUtils {
         }
     }
 
-    public static String getName(ServerWebExchange exchange) {
-        SysUser user = getUser(exchange);
+    public static String getName() {
+        SysUser user = getUser();
         if (user != null) {
             return user.getName();
         } else {
@@ -180,6 +178,68 @@ public class CmsUtils {
             "172.17.0.1", "172.18.0.1", "172.19.0.1", "172.20.0.1", "172.21.0.1",
             "192.168.0.1", "192.168.1.1", "10.0.0.1", "10.0.2.2", "10.0.75.1"
     };
+    /**
+     * MAC地址正则表达式
+     */
+    private static final Pattern macPattern = Pattern.compile("^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$");
+
+    /**
+     * 判断MAC地址是否合法
+     */
+    public static boolean isMacAddressValid(String mac) {
+        // 正则校验格式
+        if (!macPattern.matcher(mac).matches()) {
+            return false;
+        }
+        // 校验MAC地址是否为单播地址
+        String normalized = mac.toLowerCase();
+        String[] parts = normalized.split("[:-]");
+        int firstByte = Integer.parseInt(parts[0], 16);
+        return (firstByte & 1) == 0; // 最低位为0表示单播地址，合法
+    }
+
+    /**
+     * 获取客户端真实IP地址
+     * 
+     * @param request HTTP请求
+     * @return 客户端真实IP地址
+     */
+    public static String getClientIp(HttpServletRequest request) {
+        String ip = null;
+        
+        // 按优先级检查各种HTTP头
+        String[] headers = {
+            "X-Real-IP",           // 优先检查这个头，通常由Nginx设置
+            "X-Forwarded-For",     // 次优先，包含经过的所有代理IP
+            "Proxy-Client-IP",
+            "WL-Proxy-Client-IP",
+            "HTTP_CLIENT_IP",
+            "HTTP_X_FORWARDED_FOR"
+        };
+        
+        for (String header : headers) {
+            ip = request.getHeader(header);
+            if (ip != null && ip.length() > 0 && !"unknown".equalsIgnoreCase(ip)) {
+                // 如果是多级代理，获取第一个IP地址
+                if (ip.contains(",")) {
+                    ip = ip.split(",")[0].trim();
+                }
+                break;
+            }
+        }
+        
+        // 如果仍未获取到IP，则使用远程地址
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        
+        // 处理本地IPv6地址
+        if ("0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) {
+            ip = "127.0.0.1";
+        }
+        
+        return ip;
+    }
 
     /**
      * 获取服务器IP地址

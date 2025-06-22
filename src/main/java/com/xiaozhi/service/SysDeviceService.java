@@ -1,8 +1,10 @@
 package com.xiaozhi.service;
 
-import java.util.List;
-
+import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.entity.SysDevice;
+import org.apache.ibatis.javassist.NotFoundException;
+
+import java.util.List;
 
 /**
  * 设备查询/更新
@@ -18,7 +20,7 @@ public interface SysDeviceService {
    * @param device
    * @return
    */
-  public int add(SysDevice device);
+  int add(SysDevice device) throws NotFoundException;
 
   /**
    * 查询设备信息
@@ -26,22 +28,29 @@ public interface SysDeviceService {
    * @param device
    * @return
    */
-  public List<SysDevice> query(SysDevice device);
+  List<SysDevice> query(SysDevice device, PageFilter pageFilter);
+
+  /**
+   * 查询设备信息，并join配置表联查，用来过滤不存在的configId
+   * @param deviceId 设备id
+   * @return
+   */
+  SysDevice selectDeviceById(String deviceId);
 
   /**
    * 查询验证码
    */
-  public SysDevice queryVerifyCode(SysDevice device);
+  SysDevice queryVerifyCode(SysDevice device);
 
   /**
    * 查询并生成验证码
    */
-  public SysDevice generateCode(SysDevice device);
+  SysDevice generateCode(SysDevice device);
 
   /**
    * 关系设备验证码语音路径
    */
-  public int updateCode(SysDevice device);
+  int updateCode(SysDevice device);
 
   /**
    * 更新设备信息
@@ -49,7 +58,7 @@ public interface SysDeviceService {
    * @param device
    * @return
    */
-  public int update(SysDevice device);
+  int update(SysDevice device);
 
   /**
    * 删除设备
@@ -57,6 +66,12 @@ public interface SysDeviceService {
    * @param device
    * @return
    */
-  public int delete(SysDevice device);
+  int delete(SysDevice device);
 
+  /**
+   * 生成设备访问平台的token
+   * @param deviceId
+   * @return
+   */
+  String generateToken(String deviceId);
 }

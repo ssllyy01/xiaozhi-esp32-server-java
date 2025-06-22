@@ -209,7 +209,7 @@ export default {
               }
             }).catch(() => {
               this.loading = false
-              this.$message.error('服务器维护/重启中，请稍后再试')
+              this.showError();
             })
         }
       })

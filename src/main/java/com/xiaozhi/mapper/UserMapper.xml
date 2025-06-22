@@ -51,6 +51,61 @@
             username = #{username}
     </select>
 
+    <select id="queryUsers" parameterType="com.xiaozhi.entity.SysUser" resultType="com.xiaozhi.entity.SysUser">
+        SELECT
+            sys_user.userId,
+            sys_user.`name`,
+            <!-- 电话号码脱敏：显示前3位和后4位，中间用****替代 -->
+            CASE 
+                WHEN LENGTH(sys_user.tel) &gt; 7 THEN 
+                    CONCAT(LEFT(sys_user.tel, 3), '****', RIGHT(sys_user.tel, 4))
+                ELSE sys_user.tel
+            END AS tel,
+            <!-- 邮箱脱敏：显示@前面的前3位和@后面的所有内容，中间用***替代 -->
+            CASE 
+                WHEN sys_user.email LIKE '%@%' THEN 
+                    CONCAT(
+                        LEFT(sys_user.email, LEAST(3, LOCATE('@', sys_user.email) - 1)),
+                        '***',
+                        SUBSTRING(sys_user.email, LOCATE('@', sys_user.email))
+                    )
+                ELSE sys_user.email
+            END AS email,
+            sys_user.avatar,
+            sys_user.state,
+            sys_user.isAdmin,
+            sys_user.loginIp,
+            sys_user.loginTime,
+            sys_user.createTime,
+        (
+            SELECT count(*) FROM sys_device WHERE sys_device.userId = sys_user.userId
+        ) AS totalDevice,
+        (
+            SELECT
+                count(*)
+            FROM
+                sys_message
+                JOIN sys_device ON sys_device.deviceId = sys_message.deviceId
+            WHERE
+                sys_device.userId = sys_user.userId
+                <if test="startTime != null and startTime != ''">
+                    AND sys_message.createTime &gt;= #{startTime} AND sys_message.createTime &lt;= #{endTime}
+                </if>
+        ) AS totalMessage,
+        (
+            SELECT count(*) FROM sys_device WHERE sys_device.userId = sys_user.userId and sys_device.state = 1
+        ) AS aliveNumber
+        FROM
+            sys_user
+        WHERE
+            1 = 1
+            <if test="email != null and email != ''">AND sys_user.email = #{email}</if>
+            <if test="tel != null and tel != ''">AND sys_user.tel = #{tel}</if>
+            <if test="name != null and name != ''">AND name LIKE CONCAT('%', #{name}, '%')</if>
+        ORDER BY createTime DESC
+    </select>
+
+
     <select id="selectUserByUserId" resultType="com.xiaozhi.entity.SysUser">
         SELECT
         <include refid="userSql"></include>

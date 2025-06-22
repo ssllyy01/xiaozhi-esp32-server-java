@@ -1,10 +1,8 @@
 package com.xiaozhi.service;
 
-import java.util.List;
-
 import com.xiaozhi.entity.SysAgent;
 
-import reactor.core.publisher.Mono;
+import java.util.List;
 
 /**
  * 智能体服务接口
@@ -43,6 +41,6 @@ public interface SysAgentService {
      * @param agent 智能体信息
      * @return 智能体集合的Mono对象
      */
-    Mono<List<SysAgent>> query(SysAgent agent);
+    List<SysAgent> query(SysAgent agent);
 
 }

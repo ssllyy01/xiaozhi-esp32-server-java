@@ -97,6 +97,19 @@ const mixin = {
         item => key === item.deviceId || key === item.userId
       )[0];
       return data;
+    },
+    /**
+     * 显示服务器错误消息
+     * 使用全局key确保只显示一个错误消息
+     * @param {string} errorMsg 错误消息
+     */
+    showError(errorMsg = "服务器维护/重启中，请稍后再试") {
+      // 使用全局key显示错误消息，如果已存在则会更新而不是创建新的
+      this.$message.error({
+        content: errorMsg,
+        key: "error",
+        duration: 3
+      });
     }
   }
 };

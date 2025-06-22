@@ -6,11 +6,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.context.request.WebRequest;
 
 import com.xiaozhi.common.web.AjaxResult;
-
-import reactor.core.publisher.Mono;
 
 /**
  * 全局异常处理器
@@ -26,9 +24,9 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(UsernameNotFoundException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Mono<AjaxResult> handleUsernameNotFoundException(UsernameNotFoundException e, ServerWebExchange exchange) {
+    public AjaxResult handleUsernameNotFoundException(UsernameNotFoundException e, WebRequest request) {
         logger.error(e.getMessage(), e);
-        return Mono.just(AjaxResult.error("用户名不存在"));
+        return AjaxResult.error("用户名不存在");
     }
 
     /**
@@ -36,9 +34,9 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(UserPasswordNotMatchException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Mono<AjaxResult> handleUserPasswordNotMatchException(UserPasswordNotMatchException e, ServerWebExchange exchange) {
+    public AjaxResult handleUserPasswordNotMatchException(UserPasswordNotMatchException e, WebRequest request) {
         logger.error(e.getMessage(), e);
-        return Mono.just(AjaxResult.error("用户密码不正确"));
+        return AjaxResult.error("用户密码不正确");
     }
 
     /**
@@ -46,8 +44,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Mono<AjaxResult> handleException(Exception e, ServerWebExchange exchange) {
+    public AjaxResult handleException(Exception e, WebRequest request) {
         logger.error(e.getMessage(), e);
-        return Mono.just(AjaxResult.error("服务器错误，请联系管理员"));
+        return AjaxResult.error("服务器错误，请联系管理员");
     }
 }

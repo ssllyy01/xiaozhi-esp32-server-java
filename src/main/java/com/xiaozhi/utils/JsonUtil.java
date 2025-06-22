@@ -1,19 +1,19 @@
 package com.xiaozhi.utils;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.xiaozhi.websocket.handler.ReactiveWebSocketHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.SimpleDateFormat;
 
 public class JsonUtil {
-    private static final Logger logger = LoggerFactory.getLogger(ReactiveWebSocketHandler.class);
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Logger logger = LoggerFactory.getLogger(JsonUtil.class);
+    public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     public static <T> String toJson(T obj) {
         String json = null;
@@ -32,6 +32,17 @@ public class JsonUtil {
 
         try {
             pojo = OBJECT_MAPPER.readValue(json, type);
+        } catch (Exception e) {
+            logger.error("JsonUtil.toJson error", e);
+        }
+        return pojo;
+    }
+
+    public static <T> T fromJson(String json, TypeReference<T> valueTypeRef) {
+        T pojo = null;
+
+        try {
+            pojo = OBJECT_MAPPER.readValue(json, valueTypeRef);
         } catch (Exception e) {
             logger.error("JsonUtil.toJson error", e);
         }

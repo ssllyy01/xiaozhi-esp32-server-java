@@ -11,14 +11,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  */
 @JsonIgnoreProperties({ "startTime", "endTime", "start", "limit", "userId", "code" })
 public class SysDevice extends SysRole {
+    public static final String DEVICE_STATE_ONLINE = "1";
+    public static final String DEVICE_STATE_OFFLINE = "0";
 
     private String deviceId;
 
     private String sessionId;
-
-    private Integer modelId;
-
-    private Integer sttId;
 
     /**
      * 设备名称
@@ -67,6 +65,11 @@ public class SysDevice extends SysRole {
     private String chipModelName;
 
     /**
+     * 芯片类型
+     */
+    private String type;
+
+    /**
      * 固件版本
      */
     private String version;
@@ -75,25 +78,6 @@ public class SysDevice extends SysRole {
      * 可用全局function的名称列表(逗号分割)，为空则使用所有全局function
      */
     private String functionNames;
-
-
-    public Integer getModelId() {
-        return modelId;
-    }
-
-    public SysDevice setModelId(Integer modelId) {
-        this.modelId = modelId;
-        return this;
-    }
-
-    public Integer getSttId() {
-        return sttId;
-    }
-
-    public SysDevice setSttId(Integer sttId) {
-        this.sttId = sttId;
-        return this;
-    }
 
     public String getDeviceId() {
         return deviceId;
@@ -194,6 +178,15 @@ public class SysDevice extends SysRole {
         return this;
     }
 
+    public String getType() {
+        return type;
+    }
+
+    public SysDevice setType(String type) {
+        this.type = type;
+        return this;
+    }
+
     public String getVersion() {
         return version;
     }
@@ -213,11 +206,9 @@ public class SysDevice extends SysRole {
 
     @Override
     public String toString() {
-        return "SysDevice [deviceId=" + deviceId + ", sessionId=" + sessionId + ", modelId=" + modelId + ", sttId="
-                + sttId + ", deviceName=" + deviceName + ", state=" + state + ", totalMessage="
-                + totalMessage + ", code=" + code + ", audioPath=" + audioPath + ", lastLogin=" + lastLogin
-                + ", wifiName=" + wifiName + ", ip=" + ip + ", chipModelName=" + chipModelName
-                + ", version=" + version + ", functionNames=" + functionNames
-                + "]";
+        return "SysDevice [deviceId=" + deviceId + ", sessionId=" + sessionId + ", deviceName=" + deviceName + ", roleId=" + getRoleId()
+                + ", state=" + state + ", totalMessage=" + totalMessage + ", code=" + code + ", audioPath=" + audioPath
+                + ", lastLogin=" + lastLogin + ", wifiName=" + wifiName + ", ip=" + ip + ", chipModelName="
+                + chipModelName + ", type=" + type + ", version=" + version + ", functionNames=" + functionNames;
     }
 }

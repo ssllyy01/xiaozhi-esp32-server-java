@@ -6,7 +6,7 @@ package com.xiaozhi.entity;
  * @author Joey
  * 
  */
-public class SysMessage extends SysDevice {
+public class SysMessage extends Base {
     /**
      * 消息类型 - 普通消息
      */
@@ -23,8 +23,6 @@ public class SysMessage extends SysDevice {
     private Integer messageId;
 
     private String deviceId;
-
-    private String sessionId;
 
     /**
      * 消息发送方：user-用户，ai-人工智能
@@ -48,10 +46,17 @@ public class SysMessage extends SysDevice {
     private String state;
 
     /**
-     * 消息类型: NORMAL-普通消息，FUNCTION_CALL-函数调用消息，MCP-多轮对话消息
+     * 消息类型: NORMAL-普通消息，FUNCTION_CALL-函数调用消息，MCP-MCP调用消息
      *
      */
     private String messageType = "NORMAL";
+
+
+    //辅助字段，不对应数据库表
+    private String sessionId;
+    private Integer roleId;
+    private String roleName;
+    private String deviceName;
 
     public String getDeviceId() {
         return deviceId;
@@ -113,6 +118,38 @@ public class SysMessage extends SysDevice {
 
     public void setMessageType(String messageType) {
         this.messageType = messageType;
+    }
+
+    public String getSessionId() {
+        return sessionId;
+    }
+
+    public void setSessionId(String sessionId) {
+        this.sessionId = sessionId;
+    }
+
+    public Integer getRoleId() {
+        return roleId;
+    }
+
+    public void setRoleId(Integer roleId) {
+        this.roleId = roleId;
+    }
+
+    public String getRoleName() {
+        return roleName;
+    }
+
+    public void setRoleName(String roleName) {
+        this.roleName = roleName;
+    }
+
+    public String getDeviceName() {
+        return deviceName;
+    }
+
+    public void setDeviceName(String deviceName) {
+        this.deviceName = deviceName;
     }
 
     @Override

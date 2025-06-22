@@ -1,25 +1,30 @@
 package com.xiaozhi.controller;
 
-import java.util.List;
-
-import javax.annotation.Resource;
-
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.github.pagehelper.PageInfo;
 import com.xiaozhi.common.web.AjaxResult;
+import com.xiaozhi.common.web.PageFilter;
+import com.xiaozhi.communication.common.ConfigManager;
+import com.xiaozhi.dialogue.stt.factory.SttServiceFactory;
+import com.xiaozhi.dialogue.tts.factory.TtsServiceFactory;
 import com.xiaozhi.entity.SysConfig;
-import com.xiaozhi.entity.SysUser;
 import com.xiaozhi.service.SysConfigService;
 import com.xiaozhi.utils.CmsUtils;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
 
-import reactor.core.publisher.Mono;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 配置管理
@@ -30,12 +35,19 @@ import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api/config")
-public class ConfigController {
-
-    private static final Logger logger = LoggerFactory.getLogger(ConfigController.class);
+public class ConfigController extends BaseController {
 
     @Resource
     private SysConfigService configService;
+
+    @Resource
+    private ConfigManager configManager;
+
+    @Resource
+    private TtsServiceFactory ttsServiceFactory;
+
+    @Resource
+    private SttServiceFactory sttServiceFactory;
 
     /**
      * 配置查询
@@ -44,24 +56,18 @@ public class ConfigController {
      * @return configList
      */
     @GetMapping("/query")
-    public Mono<AjaxResult> query(SysConfig config, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                // 从请求属性中获取用户信息
-                SysUser user = exchange.getAttribute(CmsUtils.USER_ATTRIBUTE_KEY);
-                if (user != null) {
-                    config.setUserId(user.getUserId());
-                }
-                
-                List<SysConfig> configList = configService.query(config);
-                AjaxResult result = AjaxResult.success();
-                result.put("data", new PageInfo<>(configList));
-                return result;
-            } catch (Exception e) {
-                logger.error(e.getMessage(), e);
-                return AjaxResult.error();
-            }
-        });
+    @ResponseBody
+    public AjaxResult query(SysConfig config, HttpServletRequest request) {
+        try {
+            PageFilter pageFilter = initPageFilter(request);
+            List<SysConfig> configList = configService.query(config, pageFilter);
+            AjaxResult result = AjaxResult.success();
+            result.put("data", new PageInfo<>(configList));
+            return result;
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            return AjaxResult.error();
+        }
     }
 
     /**
@@ -71,21 +77,29 @@ public class ConfigController {
      * @return
      */
     @PostMapping("/update")
-    public Mono<AjaxResult> update(SysConfig config, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                // 从请求属性中获取用户信息
-                SysUser user = exchange.getAttribute(CmsUtils.USER_ATTRIBUTE_KEY);
-                if (user != null) {
-                    config.setUserId(user.getUserId());
+    @ResponseBody
+    public AjaxResult update(SysConfig config) {
+        try {
+            config.setUserId(CmsUtils.getUserId());
+            SysConfig oldSysConfig = configService.selectConfigById(config.getConfigId());
+            int rows = configService.update(config);
+            if (rows > 0) {
+                configManager.getConfig(config.getConfigId());// 更新缓存
+                if (oldSysConfig != null) {
+                    if ("stt".equals(oldSysConfig.getConfigType())
+                            && !oldSysConfig.getApiKey().equals(config.getApiKey())) {
+                        sttServiceFactory.removeCache(oldSysConfig);
+                    } else if ("tts".equals(oldSysConfig.getConfigType())
+                            && !oldSysConfig.getApiKey().equals(config.getApiKey())) {
+                        ttsServiceFactory.removeCache(oldSysConfig);
+                    }
                 }
-                configService.update(config);
-                return AjaxResult.success();
-            } catch (Exception e) {
-                logger.error(e.getMessage(), e);
-                return AjaxResult.error();
             }
-        });
+            return AjaxResult.success();
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            return AjaxResult.error();
+        }
     }
 
     /**
@@ -94,21 +108,67 @@ public class ConfigController {
      * @param config
      */
     @PostMapping("/add")
-    public Mono<AjaxResult> add(SysConfig config, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                // 从请求属性中获取用户信息
-                SysUser user = exchange.getAttribute(CmsUtils.USER_ATTRIBUTE_KEY);
-                if (user != null) {
-                    config.setUserId(user.getUserId());
-                }
-                
-                configService.add(config);
-                return AjaxResult.success();
-            } catch (Exception e) {
-                logger.error(e.getMessage(), e);
-                return AjaxResult.error();
+    @ResponseBody
+    public AjaxResult add(SysConfig config) {
+        try {
+            config.setUserId(CmsUtils.getUserId());
+            configService.add(config);
+            return AjaxResult.success();
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            return AjaxResult.error();
+        }
+    }
+
+    @PostMapping("/getModels")
+    @ResponseBody
+    public AjaxResult getModels(SysConfig config) {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            // 设置请求头
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + config.getApiKey());
+
+            // 构建请求实体
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            // 调用 /v1/models 接口，解析为 JSON 字符串
+            ResponseEntity<String> response = restTemplate.exchange(
+                    config.getApiUrl() + "/models",
+                    HttpMethod.GET,
+                    entity,
+                    String.class);
+
+            // 使用 ObjectMapper 解析 JSON 响应
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(response.getBody());
+
+            // 提取 "data" 字段
+            JsonNode dataNode = rootNode.get("data");
+            if (dataNode == null || !dataNode.isArray()) {
+                return AjaxResult.error("响应数据格式错误，缺少 data 字段或 data 不是数组");
             }
-        });
+
+            // 将 "data" 字段解析为 List<Map<String, Object>>
+            List<Map<String, Object>> modelList = objectMapper.convertValue(
+                    dataNode,
+                    new TypeReference<List<Map<String, Object>>>() {
+                    });
+
+            // 返回成功结果
+            AjaxResult result = AjaxResult.success();
+            result.put("data", modelList);
+            return result;
+
+        } catch (HttpClientErrorException e) {
+            // 捕获 HTTP 客户端异常并返回详细错误信息
+            String errorMessage = e.getResponseBodyAsString();
+            // 返回详细错误信息到前端
+            return AjaxResult.error("调用模型接口失败: " + errorMessage);
+
+        } catch (Exception e) {
+            // 捕获其他异常并记录日志
+            return AjaxResult.error();
+        }
     }
 }

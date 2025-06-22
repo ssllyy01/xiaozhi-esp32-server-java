@@ -1,26 +1,30 @@
 package com.xiaozhi.service.impl;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
 import com.github.pagehelper.PageHelper;
+import com.xiaozhi.common.web.PageFilter;
+import com.xiaozhi.communication.common.ChatSession;
+import com.xiaozhi.communication.common.ConfigManager;
+import com.xiaozhi.communication.common.SessionManager;
 import com.xiaozhi.dao.ConfigMapper;
 import com.xiaozhi.dao.DeviceMapper;
 import com.xiaozhi.dao.MessageMapper;
 import com.xiaozhi.dao.RoleMapper;
-import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.entity.SysDevice;
 import com.xiaozhi.entity.SysMessage;
 import com.xiaozhi.entity.SysRole;
+import com.xiaozhi.service.SysConfigService;
 import com.xiaozhi.service.SysDeviceService;
-
+import jakarta.annotation.Resource;
+import org.apache.ibatis.javassist.NotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.ObjectUtils;
 
-import javax.annotation.Resource;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * 设备操作
@@ -30,7 +34,10 @@ import javax.annotation.Resource;
  */
 
 @Service
-public class SysDeviceServiceImpl implements SysDeviceService {
+public class SysDeviceServiceImpl extends BaseServiceImpl implements SysDeviceService {
+    private static final Logger logger = LoggerFactory.getLogger(SysDeviceServiceImpl.class);
+
+    private final static String CACHE_NAME = "XiaoZhi:SysDevice";
 
     @Resource
     private DeviceMapper deviceMapper;
@@ -44,62 +51,48 @@ public class SysDeviceServiceImpl implements SysDeviceService {
     @Resource
     private RoleMapper roleMapper;
 
+    @Resource
+    private SysConfigService configService;
+
+    @Resource
+    private SessionManager sessionManager;
+
+    @Resource
+    private ConfigManager configManager;
+
     /**
      * 添加设备
      *
      * @param device
      * @return
+     * @throws NotFoundException 如果没有配置角色
      */
     @Override
-    @Transactional
-    public int add(SysDevice device) {
-        // 先查询是否有默认配置
-        SysConfig queryConfig = new SysConfig();
-        queryConfig.setUserId(device.getUserId());
-        queryConfig.setIsDefault("1");
-        // 该配置中不包含 coze 智能体
-        List<SysConfig> configs = configMapper.query(queryConfig);
-        // 单独查询智能体
-        List<SysConfig> agents = configMapper.query(queryConfig.setProvider("coze").setConfigType("llm"));
-        // 合并去重，按照 configId 去重
-        List<SysConfig> mergedConfigs = new ArrayList<>();
+    @Transactional(transactionManager = "transactionManager")
+    public int add(SysDevice device) throws NotFoundException {
 
-        // 使用LinkedHashMap保持插入顺序，以configId为键去重
-        Map<Integer, SysConfig> configMap = new LinkedHashMap<>();
-
-        // 先添加configs中的配置
-        for (SysConfig config : configs) {
-            configMap.put(config.getConfigId(), config);
-        }
-
-        // 再添加agents中的配置，如果有相同configId则会覆盖
-        for (SysConfig agent : agents) {
-            configMap.put(agent.getConfigId(), agent);
-        }
-
-        // 转换回List
-        mergedConfigs = new ArrayList<>(configMap.values());
-
-        // 遍历查询是否有默认配置
-        for (SysConfig config : mergedConfigs) {
-            if (config.getConfigType().equals("llm")) {
-                device.setModelId(config.getConfigId());
-            } else if (config.getConfigType().equals("stt")) {
-                device.setSttId(config.getConfigId());
-            }
+        SysDevice existingDevice = deviceMapper.selectDeviceById(device.getDeviceId());
+        if (existingDevice != null) {
+            return 1;
         }
 
         // 查询是否有默认角色
         SysRole queryRole = new SysRole();
         queryRole.setUserId(device.getUserId());
-        queryRole.setIsDefault("1");
         List<SysRole> roles = roleMapper.query(queryRole);
 
         if (roles.size() > 0) {
-            device.setRoleId(roles.get(0).getRoleId());
+            // 优先绑定默认角色，否则随便绑定一个
+            for (SysRole role: roles) {
+                device.setRoleId(role.getRoleId());
+                if (role.getIsDefault().equals("1")) {
+                    break;
+                }
+            }
+            return deviceMapper.add(device);
+        } else {
+            throw new NotFoundException("没有配置角色");
         }
-        // 添加设备
-        return deviceMapper.add(device);
     }
 
     /**
@@ -109,7 +102,8 @@ public class SysDeviceServiceImpl implements SysDeviceService {
      * @return
      */
     @Override
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
+    @CacheEvict(value = CACHE_NAME, key = "#device.deviceId.replace(\":\", \"-\")")
     public int delete(SysDevice device) {
         int row = deviceMapper.delete(device);
         if (row > 0) {
@@ -129,11 +123,18 @@ public class SysDeviceServiceImpl implements SysDeviceService {
      * @return
      */
     @Override
-    public List<SysDevice> query(SysDevice device) {
-        if (device.getLimit() != null && device.getLimit() > 0) {
-            PageHelper.startPage(device.getStart(), device.getLimit());
+    public List<SysDevice> query(SysDevice device, PageFilter pageFilter) {
+        if(pageFilter != null){
+            PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
         }
         return deviceMapper.query(device);
+    }
+
+    @Override
+    @Cacheable(value = CACHE_NAME, key = "#deviceId.replace(\":\", \"-\")", unless = "#result == null")
+    public SysDevice selectDeviceById(String deviceId) {
+        SysDevice device = deviceMapper.selectDeviceById(deviceId);
+        return device;  
     }
 
     /**
@@ -174,26 +175,25 @@ public class SysDeviceServiceImpl implements SysDeviceService {
      * @return
      */
     @Override
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
+    @CacheEvict(value = CACHE_NAME, key = "#device.deviceId.replace(\":\", \"-\")")
     public int update(SysDevice device) {
-        if (!ObjectUtils.isEmpty(device.getRoleId())) {
-            SysRole role = roleMapper.selectRoleById(device.getRoleId());
-            if (role != null) {
-                List<SysDevice> currentDevices = deviceMapper.query(device);
-                if (currentDevices != null && !currentDevices.isEmpty()) {
-                    SysDevice currentDevice = currentDevices.get(0);
-                    // 如果当前设备角色和修改的角色不一致，需要清空聊天记录
-                    if (currentDevice.getRoleId() != null && !currentDevice.getRoleId().equals(role.getRoleId())) {
-                        SysMessage message = new SysMessage();
-                        message.setUserId(device.getUserId());
-                        message.setDeviceId(device.getDeviceId());
-                        // 清空设备聊天记录
-                        messageMapper.delete(message);
-                    }
-                }
-            }
+        int rows = deviceMapper.update(device);
+        // 更新设备信息后清空记忆缓存并重新注册设备信息
+        device = deviceMapper.selectDeviceById(device.getDeviceId());
+        ChatSession session = sessionManager.getSessionByDeviceId(device.getDeviceId());
+        if (session != null) {
+            session.setConversation(null);
+            session.setSysDevice(device);
         }
-        return deviceMapper.update(device);
+        return rows;
+    }
+
+    @Override
+    public String generateToken(String deviceId) {
+        String token = UUID.randomUUID().toString();
+        deviceMapper.insertCode(deviceId, token);
+        return token;
     }
 
 }

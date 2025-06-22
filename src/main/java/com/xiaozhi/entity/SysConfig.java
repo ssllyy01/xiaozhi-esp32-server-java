@@ -41,6 +41,10 @@ public class SysConfig extends Base {
 
     private String apiSecret;
 
+    private String ak;
+
+    private String sk;
+
     private String apiUrl;
 
     private String state;
@@ -146,6 +150,24 @@ public class SysConfig extends Base {
         return this;
     }
 
+    public String getAk() {
+        return ak;
+    }
+
+    public SysConfig setAk(String ak) {
+        this.ak = ak;
+        return this;
+    }
+
+    public String getSk() {
+        return sk;
+    }
+
+    public SysConfig setSk(String sk) {
+        this.sk = sk;
+        return this;
+    }
+
     public String getApiUrl() {
         return apiUrl;
     }
@@ -177,7 +199,7 @@ public class SysConfig extends Base {
     public String toString() {
         return "SysConfig [configId=" + configId + ", configName=" + configName + ", configDesc=" + configDesc
                 + ", configType=" + configType + ", provider=" + provider + ", appId=" + appId + ", apiKey=" + apiKey
-                + ", apiSecret=" + apiSecret + ", apiUrl=" + apiUrl + ", state=" + state + ", isDefault=" + isDefault
-                + "]";
+                + ", apiSecret=" + apiSecret + ", ak=" + ak + ", sk=" + sk + ", apiUrl=" + apiUrl + ", state=" + state
+                + ", isDefault=" + isDefault + "]";
     }
 }

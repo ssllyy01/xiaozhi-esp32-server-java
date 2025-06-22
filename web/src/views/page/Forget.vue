@@ -292,7 +292,7 @@ export default {
                 this.currentStep = 2;
                 this.startCountdown();
               } else {
-                this.$message.error(res.message);
+                this.showError(res.message);
               }
             })
             .catch((err) => {
@@ -326,7 +326,7 @@ export default {
             this.$message.success("验证码已重新发送到您的邮箱");
             this.startCountdown();
           } else {
-            this.$message.error(res.message);
+            this.showError(res.message);
           }
         })
         .catch((err) => {
@@ -359,7 +359,7 @@ export default {
                 this.$message.success("验证成功");
                 this.currentStep = 3;
               } else {
-                this.$message.error(res.message);
+                this.showError(res.message);
               }
             })
             .catch((err) => {
@@ -396,7 +396,7 @@ export default {
                   this.$router.push("/login");
                 }, 1500);
               } else {
-                this.$message.error(res.message);
+                this.showError(res.message);
               }
             })
             .catch((err) => {

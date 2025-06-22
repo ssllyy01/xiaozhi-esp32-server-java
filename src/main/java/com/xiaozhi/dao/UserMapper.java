@@ -25,8 +25,7 @@ public interface UserMapper {
 
     int update(SysUser user);
 
-    List<SysUser> queryUsers(@Param("user") SysUser user, @Param("startTime") String startTime,
-            @Param("endTime") String endTime);
+    List<SysUser> queryUsers(SysUser user);
 
     int generateCode(SysUser user);
 

@@ -22,6 +22,17 @@ export default new Router({
           meta: { title: "Dashboard", icon: "dashboard" }
         },
         {
+          path: "/user",
+          component: resolve => require(["@/views/page/User"], resolve),
+          name: "User",
+          meta: {
+            title: "用户管理",
+            icon: "team",
+            breadcrumb: [{ breadcrumbName: "用户管理" }],
+            isAdmin: 1
+          }
+        },
+        {
           path: "/device",
           component: resolve => require(["@/views/page/Device"], resolve),
           name: "Device",
@@ -60,22 +71,12 @@ export default new Router({
           component: resolve => require(["@/views/common/PageView"], resolve),
           name: "Config",
           redirect: "/config/model",
-          meta: { title: "配置管理", icon: "setting" },
+          meta: { title: "配置管理", icon: "setting", isAdmin: 1 },
           children: [
             {
               path: "/config/model",
               component: resolve => require(["@/views/page/config/ModelConfig"], resolve),
-              meta: { title: "模型配置", parent: "配置管理" }
-            },
-            {
-              path: "/config/stt",
-              component: resolve => require(["@/views/page/config/SttConfig"], resolve),
-              meta: { title: "语音识别配置", parent: "配置管理" }
-            },
-            {
-              path: "/config/tts",
-              component: resolve => require(["@/views/page/config/TtsConfig"], resolve),
-              meta: { title: "语音合成配置", parent: "配置管理" }
+              meta: { title: "模型配置", parent: "配置管理", isAdmin: 1 },
             },
             {
               path: "/config/agent",
@@ -84,7 +85,18 @@ export default new Router({
               meta: {
                 title: "智能体管理",
                 parent: "配置管理",
-              }
+                isAdmin: 1
+              },
+            },
+            {
+              path: "/config/stt",
+              component: resolve => require(["@/views/page/config/SttConfig"], resolve),
+              meta: { title: "语音识别配置", parent: "配置管理", isAdmin: 1 },
+            },
+            {
+              path: "/config/tts",
+              component: resolve => require(["@/views/page/config/TtsConfig"], resolve),
+              meta: { title: "语音合成配置", parent: "配置管理", isAdmin: 1 },
             },
           ]
         },
@@ -108,7 +120,17 @@ export default new Router({
               meta: { title: "个人设置", parent: "设置" }
             }
           ]
-        }
+        },
+        {
+          path: "/chat",
+          component: resolve => require(["@/views/page/Chat"], resolve),
+          name: "Chat",
+          meta: {
+            title: "聊天",
+            icon: "message",
+            breadcrumb: [{ breadcrumbName: "聊天" }]
+          }
+        },
       ]
     },
     {

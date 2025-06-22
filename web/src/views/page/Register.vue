@@ -469,7 +469,7 @@ export default {
                 // 用户名和邮箱都可用，发送验证码
                 return this.sendVerifyCode();
               } else {
-                this.$message.error(res.message);
+                this.showError(res.message);
               }
             })
             .catch((err) => {

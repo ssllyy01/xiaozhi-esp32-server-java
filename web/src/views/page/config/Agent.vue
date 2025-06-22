@@ -9,7 +9,6 @@
               <a-col :xl="8" :lg="12" :xs="24">
                 <a-form-item label="平台">
                   <a-select v-model="query.provider" @change="getData()">
-                    <a-select-option value="">全部</a-select-option>
                     <a-select-option v-for="item in providerOptions" :key="item.value" :value="item.value">
                       {{ item.label }}
                     </a-select-option>
@@ -32,7 +31,7 @@
               <a-icon type="plus" />添加平台配置
             </a-button>
           </template>
-          <a-table rowKey="bot_id" :columns="tableColumns" :data-source="agentList" :loading="loading"
+          <a-table rowKey="configId" :columns="getTableColumns" :data-source="agentList" :loading="loading"
             :pagination="pagination" @change="handleTableChange" size="middle" :scroll="{ x: 1000 }">
             <!-- Icon -->
             <template slot="iconUrl" slot-scope="text, record">
@@ -40,15 +39,14 @@
             </template>
             <!-- 智能体名称 -->
             <template slot="agentName" slot-scope="text, record">
-              <div>
+              <a-tooltip :title="text" :mouseEnterDelay="0.5" placement="leftTop">
                 <span v-if="text">{{ text }}</span>
                 <span v-else style="padding: 0 50px">&nbsp;&nbsp;&nbsp;</span>
-              </div>
+              </a-tooltip>
             </template>
-
             <!-- 平台 -->
             <template slot="provider" slot-scope="text">
-              <a-tag :color="getProviderColor(text)">{{ text }}</a-tag>
+              <a-tag color="blue">{{ text }}</a-tag>
             </template>
             <!-- 描述 -->
             <template slot="agentDesc" slot-scope="text">
@@ -68,7 +66,7 @@
                 <!-- 添加设为默认按钮 -->
                 <a v-if="record.isDefault != 1" href="javascript:" :disabled="record.isDefault == 1" @click="setAsDefault(record)">设为默认</a>
                 <a-popconfirm title="确定要删除此智能体吗？" @confirm="handleDelete(record)">
-                  <a href="javascript:" style="color: #ff4d4f">删除</a>
+                  <a v-if="record.isDefault != 1" href="javascript:" style="color: #ff4d4f">删除</a>
                 </a-popconfirm>
               </a-space>
             </template>
@@ -90,7 +88,11 @@
               {{ option.label }}
             </a-select-option>
           </a-select>
-          <a-input v-else v-model="platformForm[item.field]" :placeholder="item.placeholder" />
+          <a-input v-else v-model="platformForm[item.field]" :placeholder="item.placeholder" >
+            <template v-if="item.suffix" slot="suffix">
+              <span style="color: #999">{{ item.suffix }}</span>
+            </template>
+          </a-input>
         </a-form-model-item>
         
         <!-- 添加设为默认选项 -->
@@ -116,17 +118,17 @@ export default {
       // 查询参数
       query: {
         agentName: '',
-        provider: 'COZE'
+        provider: 'coze'
       },
       // 平台选项
       providerOptions: [
-        { label: 'COZE', value: 'COZE' },
+        { label: 'Coze', value: 'coze' },
+        { label: 'Dify', value: 'dify' }
       ],
       // 表格列定义
       tableColumns: [
         { title: '头像', dataIndex: 'iconUrl', width: 80, align: 'center', scopedSlots: { customRender: 'iconUrl' }, fixed: 'left' },
-        { title: '智能体名称', dataIndex: 'agentName', scopedSlots: { customRender: 'agentName' }, width: 150, align: 'center', fixed: 'left' },
-        { title: '智能体ID', dataIndex: 'botId', width: 180, align: 'center' },
+        { title: '智能体名称', dataIndex: 'agentName', scopedSlots: { customRender: 'agentName' }, width: 150, align: 'center', fixed: 'left', ellipsis: true },
         { title: '平台', dataIndex: 'provider', scopedSlots: { customRender: 'provider' }, width: 80, align: 'center' },
         { title: '智能体描述', dataIndex: 'agentDesc', align: 'center', scopedSlots: { customRender: 'agentDesc' }, ellipsis: true },
         // 添加默认状态列
@@ -143,7 +145,7 @@ export default {
       // 平台表单对象
       platformForm: {
         configType: 'agent',
-        provider: 'COZE',
+        provider: 'coze',
         configName: '',
         configDesc: '',
         appId: '',
@@ -160,20 +162,35 @@ export default {
           type: 'select',
           placeholder: '请选择平台类型',
           options: [
-            { label: 'COZE', value: 'COZE' },
+            { label: 'Coze', value: 'coze' },
+            { label: 'Dify', value: 'dify' }
           ]
         },
         {
           field: 'appId',
           label: 'Space ID',
           placeholder: '请输入Coze Space ID',
-          condition: { field: 'provider', value: 'COZE' }
+          condition: { field: 'provider', value: 'coze' }
         },
         {
           field: 'apiSecret',
           label: 'Secret token',
           placeholder: '请输入Secret token',
-        }
+          condition: { field: 'provider', value: 'coze' }
+        },
+        {
+          field: 'apiUrl',
+          label: 'apiUrl',
+          placeholder: '请输入apiUrl',
+          condition: { field: 'provider', value: 'dify' },
+          suffix: '/chat_message'
+        },
+        {
+           field: 'apiKey',
+           label: 'apiKey',
+           placeholder: '请输入apiKey',
+           condition: { field: 'provider', value: 'dify' }
+        },
       ],
 
       // 平台表单验证规则
@@ -181,12 +198,45 @@ export default {
         provider: [{ required: true, message: '请选择平台类型', trigger: 'change' }],
         configName: [{ required: true, message: '请输入配置名称', trigger: 'blur' }],
         appId: [{ required: true, message: '请输入Space ID', trigger: 'blur' }],
-        apiSecret: [{ required: true, message: '请输入Secret token', trigger: 'blur' }]
+        apiSecret: [{ required: true, message: '请输入Secret token', trigger: 'blur' }],
+        apiUrl: [{ required: true, message: '请输入URL', trigger: 'blur' }],
+        apiKey: [{ required: true, message: '请输入apiKey', trigger: 'blur' }]
       }
+    }
+  },
+  computed: {
+    // 根据当前选择的平台动态生成表格列
+    getTableColumns() {
+      // 创建列数组的副本，以免修改原始数据
+      const columns = [...this.tableColumns];
+      
+      // 如果当前选择的是Coze平台，则插入智能体ID列
+      if (this.query.provider === 'coze') {
+        const botIdColumn = { 
+          title: '智能体ID', 
+          dataIndex: 'botId', 
+          width: 180, 
+          align: 'center', 
+          scopedSlots: { customRender: 'botId' } 
+        }
+        // 在第二列后插入智能体ID列
+        columns.splice(2, 0, botIdColumn);
+      }
+      
+      return columns;
     }
   },
   created() {
     this.getData()
+  },
+  watch: {
+    // 监听平台类型变化，根据不同平台设置不同的默认值
+    'platformForm.provider': function(newVal) {
+      if (newVal === 'dify') {
+        // 如果切换到Dify平台，设置默认的apiUrl
+        this.platformForm.apiUrl = 'https://api.dify.ai/v1';
+      }
+    }
   },
   methods: {
     // 获取智能体列表
@@ -225,9 +275,10 @@ export default {
       // 重置表单
       this.platformForm = {
         configType: 'agent',
-        provider: 'COZE',
+        provider: 'coze',
         appId: '',
         apiSecret: '',
+        apiKey: '',
         isDefault: false
       };
 
@@ -239,6 +290,16 @@ export default {
       this.$refs.platformForm.validate(valid => {
         if (valid) {
           this.platformModalLoading = true;
+
+          // 如果是Dify平台，确保apiUrl有正确的后缀
+          if (this.platformForm.provider === 'dify' && this.platformForm.apiUrl) {
+            // 确保URL末尾没有斜杠
+            let baseUrl = this.platformForm.apiUrl;
+            if (baseUrl.endsWith('/')) {
+              baseUrl = baseUrl.slice(0, -1);
+            }
+            this.platformForm.apiUrl = baseUrl;
+          }
 
           // 调用后端API添加配置
           axios.post({
@@ -300,7 +361,7 @@ export default {
                 this.$message.success(`已将"${record.agentName}"设为默认智能体`);
                 this.getData();
               } else {
-                this.$message.error(res.message);
+                this.showError(res.message);
               }
             })
             .catch(error => {
@@ -331,36 +392,6 @@ export default {
           this.$message.error('服务器错误，请稍后再试');
         });
     },
-
-    // 获取平台对应的标签颜色
-    getProviderColor(provider) {
-      const colorMap = {
-        'coze': 'blue',
-        'COZE': 'blue',
-        '微信': 'green',
-        '飞书': 'orange',
-        'Telegram': 'cyan',
-        'Slack': 'purple'
-      };
-      return colorMap[provider];
-    }
   }
 }
 </script>
-
-<style scoped>
-.layout-content-margin {
-  margin: 24px;
-}
-
-.table-search {
-  margin-bottom: 16px;
-  background: #fff;
-  padding: 16px;
-}
-
-.filter-flex {
-  display: flex;
-  flex-wrap: wrap;
-}
-</style>

@@ -60,33 +60,12 @@
           >
             <a-card title="聊天记录" :bordered="false">
               <a-skeleton :loading="loading" active :paragraph="{ rows: 10 }">
-                <a-spin :spinning="!busy" class="infinite-loading">
-                  <!-- 无限滚动 -->
-                  <a-list rowKey="messageId">
-                    <RecycleScroller
-                      v-infinite-scroll="infiniteOnLoad"
-                      style="height: 450px; overflow-y: scroll"
-                      key-field="messageId"
-                      :items="listItem"
-                      :item-size="120"
-                      :infinite-scroll-disabled="busy"
-                      :infinite-scroll-distance="10"
-                      :infinite-scroll-immediate-check="busy"
-                    >
-                      <a-list-item key="messageId" slot-scope="{ item }">
-                        <a-list-item-meta>
-                          <a-avatar slot="avatar" :src="getAvatarUrl(item.avatar)" />
-                          <span slot="title">{{ item.deviceName || name }}</span>
-                          <template slot="description">
-                            <p>{{ item.description }}</p>
-                            <span>{{ moment(item.createTime).fromNow() }}</span>
-                            <a-divider style="margin: 12px 0" />
-                          </template>
-                        </a-list-item-meta>
-                      </a-list-item>
-                    </RecycleScroller>
-                  </a-list>
-                </a-spin>
+                <chat-component 
+                  :message-list="formattedChatMessages" 
+                  :show-input="true"
+                  :user-avatar="userAvatar"
+                  :ai-avatar="aiAvatar"
+                />
               </a-skeleton>
             </a-card>
           </a-col>
@@ -200,13 +179,11 @@ import mixin from "@/mixins/index";
 import Cookies from "js-cookie";
 import { jsonp } from 'vue-jsonp';
 import { timeFix, welcome } from "@/utils/util";
-const RecycleScroller = window["vue-virtual-scroller"].RecycleScroller;
-const infiniteScroll = require("@/utils/vue-infinite-scroll.js").infiniteScroll;
+import ChatComponent from '@/components/ChatComponent.vue';
 
 export default {
   mixins: [mixin],
-  directives: { infiniteScroll },
-  components: { RecycleScroller },
+  components: { ChatComponent },
   data() {
     return {
       // 欢迎页面
@@ -294,7 +271,22 @@ export default {
     userInfo() {
       return this.$store.getters.USER_INFO;
     },
-    
+    // 格式化聊天消息，将listItem转换为ChatComponent需要的格式
+    formattedChatMessages() {
+      return this.listItem.map(item => {
+        // 根据消息类型确定是用户消息还是系统消息
+        const isUser = item.type === 3; // 假设type=3是用户消息
+        
+        return {
+          id: item.messageId,
+          content: item.description,
+          type: 'text',
+          isUser: isUser,
+          timestamp: new Date(item.createTime),
+          avatar: item.avatar
+        };
+      });
+    }
   },
   methods: {
     getAvatarUrl(avatar) {
@@ -333,12 +325,12 @@ export default {
           if (res.code === 200) {
             this.data = res.data.list;
           } else {
-            this.$message.error(res.message);
+            this.$message.error(res.message)
           }
         })
         .catch(() => {
           this.userLoading = false
-          this.$message.error("服务器维护/重启中,请稍后再试");
+          this.showError();
         });
     },
     infiniteOnLoad() {

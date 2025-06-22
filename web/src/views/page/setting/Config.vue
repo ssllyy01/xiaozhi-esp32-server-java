@@ -232,7 +232,7 @@ export default {
                 this.$message.error(res.message)
               }
             }).catch(() => {
-              this.$message.error('服务器维护/重启中，请稍后再试')
+              this.showError();
             })
         }
       })

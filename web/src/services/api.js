@@ -42,7 +42,8 @@ export default {
   config: {
     add: "/api/config/add",
     query: "/api/config/query",
-    update: "/api/config/update"
+    update: "/api/config/update",
+    getModels: "/api/config/getModels"
   },
-  uploadAvatar: "/api/uploadAvatar"
+  upload: "/api/file/upload"
 };

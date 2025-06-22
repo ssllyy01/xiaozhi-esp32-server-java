@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -37,6 +38,17 @@ public class EmojiUtils {
     private static final Pattern HTML_TAG_PATTERN = Pattern.compile("<[^>]+>");
     private static final Pattern SPECIAL_CHARS_PATTERN = Pattern.compile("[@#№$%&*]");
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
+    
+    // 颜文字模式 - 匹配常见的颜文字组合
+    private static final Pattern KAOMOJI_PATTERN = Pattern.compile(
+        "[(（][^)）]{1,10}[)）]|" +  // 如 (^_^) (・ω・) (≧▽≦)
+        "[<＜][^>＞]{1,10}[>＞]|" +  // 如 <(￣︶￣)>
+        "[\\\\¯\\\\*][_-]{1,2}[\\\\¯\\\\*]|" +  // 如 \_/ \*_*\
+        "\\\\o/|" +                 // \o/
+        ":-?[)D(]|" +               // :-) :D :-(
+        ";-?[)]|" +                 // ;-)
+        "=\\\\?[_/]"                // =_= =/=
+    );
 
     // 表情符号到情绪单词的映射
     private static final Map<String, String> emojiToEmotionMap = new HashMap<>();
@@ -143,6 +155,34 @@ public class EmojiUtils {
     }
 
     /**
+     * 检查文本是否包含颜文字
+     *
+     * @param text 要检查的文本
+     * @return 如果包含颜文字返回true，否则返回false
+     */
+    public static boolean containsKaomoji(String text) {
+        if (text == null || text.isEmpty()) {
+            return false;
+        }
+        Matcher matcher = KAOMOJI_PATTERN.matcher(text);
+        return matcher.find();
+    }
+
+    /**
+     * 过滤文本中的颜文字
+     *
+     * @param text 要过滤的文本
+     * @return 过滤后的文本
+     */
+    public static String filterKaomoji(String text) {
+        if (text == null) {
+            return null;
+        }
+        // 将颜文字替换为空字符串
+        return KAOMOJI_PATTERN.matcher(text).replaceAll("");
+    }
+
+    /**
      * 提取句子中的表情符号
      *
      * @param text 输入的句子
@@ -202,7 +242,11 @@ public class EmojiUtils {
                 i++;
             }
         }
-        return new EmoSentence(text, cleanedText.toString().trim(), moods);
+        
+        // 过滤颜文字
+        String filteredText = filterKaomoji(cleanedText.toString().trim());
+        
+        return new EmoSentence(text, filteredText, moods);
     }
 
     /**
@@ -245,5 +289,4 @@ public class EmojiUtils {
             this.moods = moods;
         }
     }
-
 }

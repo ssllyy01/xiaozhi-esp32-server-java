@@ -3,20 +3,21 @@ package com.xiaozhi.service.impl;
 import com.github.pagehelper.PageHelper;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
 import com.xiaozhi.common.exception.UsernameNotFoundException;
+import com.xiaozhi.common.web.PageFilter;
+import com.xiaozhi.dao.ConfigMapper;
+import com.xiaozhi.dao.RoleMapper;
 import com.xiaozhi.dao.UserMapper;
 import com.xiaozhi.entity.SysUser;
 import com.xiaozhi.security.AuthenticationService;
 import com.xiaozhi.service.SysUserService;
 import com.xiaozhi.utils.DateUtils;
-
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
-import org.springframework.util.StringUtils;
 
 import java.util.List;
 
-import javax.annotation.Resource;
 
 /**
  * 用户操作
@@ -26,13 +27,19 @@ import javax.annotation.Resource;
  */
 
 @Service
-public class SysUserServiceImpl implements SysUserService {
+public class SysUserServiceImpl extends BaseServiceImpl implements SysUserService {
 
     private static final String dayOfMonthStart = DateUtils.dayOfMonthStart();
     private static final String dayOfMonthEnd = DateUtils.dayOfMonthEnd();
 
     @Resource
     private UserMapper userMapper;
+
+    @Resource
+    private ConfigMapper configMapper;
+
+    @Resource
+    private RoleMapper roleMapper;
 
     @Resource
     private AuthenticationService authenticationService;
@@ -75,15 +82,11 @@ public class SysUserServiceImpl implements SysUserService {
      * @return 用户列表
      */
     @Override
-    public List<SysUser> queryUsers(SysUser user) {
-        if (user.getStart() != null) {
-            PageHelper.startPage(user.getStart(), user.getLimit());
+    public List<SysUser> queryUsers(SysUser user, PageFilter pageFilter) {
+        if(pageFilter != null){
+            PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
         }
-        // 日期是用于后续做统计使用，但功能还未实现，所以这里先将日期设置为本月第一天和最后一天
-        // todo
-        return userMapper.queryUsers(user,
-                !StringUtils.hasText(user.getStartTime()) ? user.getStartTime() : dayOfMonthStart,
-                !StringUtils.hasText(user.getEndTime()) ? user.getEndTime() : dayOfMonthEnd);
+        return userMapper.queryUsers(user);
     }
 
     @Override
@@ -108,7 +111,7 @@ public class SysUserServiceImpl implements SysUserService {
      * @return
      */
     @Override
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public int add(SysUser user) {
         return userMapper.add(user);
     }
@@ -120,7 +123,7 @@ public class SysUserServiceImpl implements SysUserService {
      * @return
      */
     @Override
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public int update(SysUser user) {
         return userMapper.update(user);
     }

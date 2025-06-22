@@ -3,20 +3,36 @@
 <mapper namespace="com.xiaozhi.dao.RoleMapper">
 
     <sql id="roleSql">
-        sys_role.roleId, sys_role.roleName, sys_role.roleDesc, sys_role.voiceName, sys_role.ttsId, sys_role.userId, sys_role.state, sys_role.isDefault, sys_role.createTime
+        sys_role.roleId, sys_role.roleName, sys_role.roleDesc, sys_role.voiceName,
+        sys_role.modelId, sys_role.sttId, sys_role.ttsId,
+        sys_role.vadSpeechTh, sys_role.vadSilenceTh, sys_role.vadEnergyTh, sys_role.vadSilenceMs,
+        sys_role.userId, sys_role.state, sys_role.isDefault, sys_role.createTime
     </sql>
 
-    <sql id="configSql">
-        sys_config.configId, sys_config.provider, sys_config.appId, sys_config.apiKey, sys_config.apiSecret
+    <sql id="modelSql">
+        model_config.configId AS modelId, model_config.configName AS modelName, model_config.provider AS modelProvider
+    </sql>
+
+    <sql id="sttSql">
+        stt_config.configId AS sttId
+    </sql>
+
+    <sql id="ttsSql">
+        tts_config.configId AS ttsId, tts_config.provider AS ttsProvider, tts_config.appId, tts_config.apiKey, tts_config.apiSecret, tts_config.ak, tts_config.sk
     </sql>
 
     <select id="query" resultType="com.xiaozhi.entity.SysRole">
         SELECT
         <include refid="roleSql"></include>,
-        <include refid="configSql"></include>
+        <include refid="modelSql"></include>,
+        <include refid="sttSql"></include>,
+        <include refid="ttsSql"></include>,
+        (SELECT COUNT(*) FROM sys_device WHERE sys_device.roleId = sys_role.roleId) AS totalDevice
         FROM
             sys_role
-            LEFT JOIN sys_config ON sys_role.ttsId = sys_config.configId
+            LEFT JOIN sys_config tts_config ON sys_role.ttsId = tts_config.configId AND tts_config.configType = 'tts'
+            LEFT JOIN sys_config model_config ON sys_role.modelId = model_config.configId AND model_config.configType = 'llm'
+            LEFT JOIN sys_config stt_config ON sys_role.sttId = stt_config.configId AND stt_config.configType = 'stt'
         WHERE
             sys_role.state = 1
             <if test="userId != null and userId != ''">AND sys_role.userId = #{userId}</if>
@@ -33,10 +49,17 @@
             <if test="roleDesc != null and roleDesc != ''">roleDesc = #{roleDesc},</if>
             <if test="voiceName != null and voiceName != ''">voiceName = #{voiceName},</if>
             <if test="isDefault != null and isDefault != ''">isDefault = #{isDefault},</if>
+            <if test="modelId != null and modelId != ''">modelId = #{modelId},</if>
             <if test="ttsId != null and ttsId != ''">
                 <choose>
                     <when test="ttsId == -1">ttsId = null,</when>
                     <otherwise>ttsId = #{ttsId},</otherwise>
+                </choose>
+            </if>
+            <if test="sttId != null and sttId != ''">
+                <choose>
+                    <when test="sttId == -1">sttId = null,</when>
+                    <otherwise>sttId = #{sttId},</otherwise>
                 </choose>
             </if>
             <if test="state != null and state != ''">state = #{state},</if>
@@ -56,8 +79,21 @@
     </update>
 
     <insert id="add" useGeneratedKeys="true" keyProperty="roleName" parameterType="com.xiaozhi.entity.SysRole">
-        INSERT INTO sys_role ( roleName, roleDesc, voiceName, ttsId, userId, isDefault ) VALUES (
-            #{roleName}, #{roleDesc}, #{voiceName}, #{ttsId}, #{userId}, isDefault
+        INSERT INTO sys_role ( roleName, roleDesc, voiceName, modelId, ttsId, sttId, userId, isDefault ) VALUES (
+            #{roleName},
+            #{roleDesc},
+            #{voiceName},
+            #{modelId},
+            <choose>
+                <when test="ttsId == -1">null</when>
+                <otherwise>#{ttsId}</otherwise>
+            </choose>,
+            <choose>
+                <when test="sttId == -1">null</when>
+                <otherwise>#{sttId}</otherwise>
+            </choose>,
+            #{userId},
+            #{isDefault}
         )
     </insert>
 

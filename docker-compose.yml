@@ -38,7 +38,7 @@ services:
         - VOSK_MODEL_SIZE=${VOSK_MODEL_SIZE:-small}
       # 添加构建缓存设置
       cache_from:
-        - eclipse-temurin:8-jre
+        - eclipse-temurin:21-jre
     depends_on:
       mysql:
         condition: service_healthy

@@ -1,8 +1,8 @@
 package com.xiaozhi.entity;
 
-import java.util.Date;
-
 import com.fasterxml.jackson.annotation.JsonFormat;
+
+import java.util.Date;
 
 /**
  * 智能体实体类

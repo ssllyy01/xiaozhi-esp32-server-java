@@ -4,12 +4,12 @@ usr/
 node_modules/
 out/
 gen/
-build/
 dist/
 avatar/
 # 忽略特定格式的文件
+uploads/
 audio/
-vosk*
+vosk-model*
 *.zip
 *.log
 *.tmp
@@ -30,4 +30,4 @@ vosk*
 # 忽略本地配置文件
 application-local.properties
 
-*Stream*
+.vscode/

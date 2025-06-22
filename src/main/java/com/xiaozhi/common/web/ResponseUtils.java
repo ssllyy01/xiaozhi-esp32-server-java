@@ -1,69 +1,66 @@
 package com.xiaozhi.common.web;
 
+import java.io.IOException;
+
+
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.server.reactive.ServerHttpResponse;
-import org.springframework.web.server.ServerWebExchange;
 
-import reactor.core.publisher.Mono;
-
-import java.nio.charset.StandardCharsets;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * ServerHttpResponse帮助类
+ * HttpServletResponse帮助类
  */
 public final class ResponseUtils {
-    public static final Logger logger = LoggerFactory.getLogger(ResponseUtils.class);
+    public static final Logger log = LoggerFactory.getLogger(ResponseUtils.class);
 
     /**
      * 发送文本。使用UTF-8编码。
      * 
-     * @param exchange ServerWebExchange
+     * @param response HttpServletResponse
      * @param text     发送的字符串
      */
-    public static Mono<Void> renderText(ServerWebExchange exchange, String text) {
-        return render(exchange, MediaType.TEXT_PLAIN, text);
+    public static void renderText(HttpServletResponse response, String text) {
+        render(response, "text/plain;charset=UTF-8", text);
     }
 
     /**
      * 发送json。使用UTF-8编码。
      * 
-     * @param exchange ServerWebExchange
+     * @param response HttpServletResponse
      * @param text     发送的字符串
      */
-    public static Mono<Void> renderJson(ServerWebExchange exchange, String text) {
-        return render(exchange, MediaType.APPLICATION_JSON, text);
+    public static void renderJson(HttpServletResponse response, String text) {
+        render(response, "application/json;charset=UTF-8", text);
     }
 
     /**
      * 发送xml。使用UTF-8编码。
      * 
-     * @param exchange ServerWebExchange
+     * @param response HttpServletResponse
      * @param text     发送的字符串
      */
-    public static Mono<Void> renderXml(ServerWebExchange exchange, String text) {
-        return render(exchange, MediaType.TEXT_XML, text);
+    public static void renderXml(HttpServletResponse response, String text) {
+        render(response, "text/xml;charset=UTF-8", text);
     }
 
     /**
      * 发送内容。使用UTF-8编码。
      * 
-     * @param exchange
-     * @param mediaType
+     * @param response
+     * @param contentType
      * @param text
      */
-    public static Mono<Void> render(ServerWebExchange exchange, MediaType mediaType, String text) {
-        ServerHttpResponse response = exchange.getResponse();
-        response.getHeaders().setContentType(mediaType);
-        response.getHeaders().add(HttpHeaders.PRAGMA, "No-cache");
-        response.getHeaders().add(HttpHeaders.CACHE_CONTROL, "no-cache");
-        response.getHeaders().setExpires(0);
-        
-        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
-        DataBuffer buffer = response.bufferFactory().wrap(bytes);
-        return response.writeWith(Mono.just(buffer));
+    public static void render(HttpServletResponse response, String contentType, String text) {
+        response.setContentType(contentType);
+        response.setHeader("Pragma", "No-cache");
+        response.setHeader("Cache-Control", "no-cache");
+        response.setDateHeader("Expires", 0);
+        try {
+            response.getWriter().write(text);
+        } catch (IOException e) {
+            log.error(e.getMessage(), e);
+        }
     }
 }

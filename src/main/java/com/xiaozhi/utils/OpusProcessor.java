@@ -1,29 +1,20 @@
 package com.xiaozhi.utils;
 
-import io.github.jaredmdobson.concentus.OpusEncoder;
-import io.github.jaredmdobson.concentus.OpusApplication;
-import io.github.jaredmdobson.concentus.OpusDecoder;
-import io.github.jaredmdobson.concentus.OpusException;
-import io.github.jaredmdobson.concentus.OpusSignal;
-
+import io.github.jaredmdobson.concentus.*;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.annotation.PreDestroy;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.file.Files;
 
 @Component
 public class OpusProcessor {
@@ -33,13 +24,90 @@ public class OpusProcessor {
     private final ConcurrentHashMap<String, OpusDecoder> decoders = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, OpusEncoder> encoders = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, short[]> overlaps = new ConcurrentHashMap<>();
+    // 残留数据状态缓存
+    private final ConcurrentHashMap<String, LeftoverState> leftoverStates = new ConcurrentHashMap<>();
 
     // 常量
-    private static final int FRAME_SIZE = 960;
+    private static final int FRAME_SIZE = AudioUtils.FRAME_SIZE;
     private static final int SAMPLE_RATE = AudioUtils.SAMPLE_RATE;
     private static final int CHANNELS = AudioUtils.CHANNELS;
-    private static final int FRAME_MS = 60;
+    public static final int OPUS_FRAME_DURATION_MS = AudioUtils.OPUS_FRAME_DURATION_MS;
     private static final int MAX_SIZE = 1275;
+
+    // 预热帧数量 - 添加几个静音帧来预热编解码器
+    private static final int PRE_WARM_FRAMES = 2;
+
+    /**
+     * 残留数据状态类
+     */
+    public static class LeftoverState {
+        public short[] leftoverBuffer;
+        public int leftoverCount;
+        public boolean isFirst = true;
+
+        public LeftoverState() {
+            leftoverBuffer = new short[FRAME_SIZE]; // 预分配一个帧大小的缓冲区
+            leftoverCount = 0;
+        }
+
+        public void clear() {
+            leftoverCount = 0;
+            Arrays.fill(leftoverBuffer, (short) 0);
+        }
+    }
+
+    /**
+     * 获取会话的残留数据状态
+     */
+    private LeftoverState getLeftoverState(String sid) {
+        return leftoverStates.computeIfAbsent(sid, k -> new LeftoverState());
+    }
+
+    /**
+     * 删除会话的残留数据状态
+     */
+    public void removeLeftoverState(String sid) {
+        leftoverStates.remove(sid);
+    }
+
+    /**
+     * 刷新残留数据，生成最后一帧
+     */
+    public List<byte[]> flushLeftover(String sid) {
+        LeftoverState state = getLeftoverState(sid);
+        List<byte[]> frames = new ArrayList<>();
+
+        if (state.leftoverCount <= 0) {
+            return frames;
+        }
+
+        // 获取编码器
+        OpusEncoder encoder = getEncoder(sid, SAMPLE_RATE, CHANNELS);
+
+        // 准备缓冲区
+        short[] shortBuf = new short[FRAME_SIZE];
+        byte[] opusBuf = new byte[MAX_SIZE];
+
+        // 复制残留数据并填充静音
+        System.arraycopy(state.leftoverBuffer, 0, shortBuf, 0, state.leftoverCount);
+        Arrays.fill(shortBuf, state.leftoverCount, FRAME_SIZE, (short) 0);
+
+        try {
+            // 编码最后一帧
+            int opusLen = encoder.encode(shortBuf, 0, FRAME_SIZE, opusBuf, 0, opusBuf.length);
+            if (opusLen > 0) {
+                byte[] frame = new byte[opusLen];
+                System.arraycopy(opusBuf, 0, frame, 0, opusLen);
+                frames.add(frame);
+            }
+        } catch (OpusException e) {
+            logger.warn("残留数据编码失败: {}", e.getMessage());
+        }
+
+        // 清空缓存
+        state.clear();
+        return frames;
+    }
 
     /**
      * Opus转PCM字节数组
@@ -51,7 +119,7 @@ public class OpusProcessor {
 
         try {
             OpusDecoder decoder = getDecoder(sid);
-            short[] buf = new short[FRAME_SIZE * 6];
+            short[] buf = new short[FRAME_SIZE * 12];
             int samples = decoder.decode(data, 0, data.length, buf, 0, buf.length, false);
 
             byte[] pcm = new byte[samples * 2];
@@ -66,6 +134,79 @@ public class OpusProcessor {
             resetDecoder(sid);
             throw e;
         }
+    }
+
+    /**
+     * 平滑连接多个PCM片段
+     */
+    public byte[] smoothJoinPcm(List<byte[]> pcmChunks) {
+        if (pcmChunks == null || pcmChunks.isEmpty()) {
+            return new byte[0];
+        }
+        
+        // 计算总长度
+        int totalLength = 0;
+        for (byte[] chunk : pcmChunks) {
+            totalLength += chunk.length;
+        }
+        
+        // 创建结果缓冲区
+        byte[] result = new byte[totalLength];
+        int offset = 0;
+        
+        // 应用交叉淡入淡出的重叠区域长度（毫秒）
+        int overlapMs = 10; // 10ms的重叠
+        int overlapBytes = (SAMPLE_RATE * 2 * CHANNELS * overlapMs) / 1000; // 每毫秒的字节数
+        
+        for (int i = 0; i < pcmChunks.size(); i++) {
+            byte[] chunk = pcmChunks.get(i);
+            
+            if (i == 0) {
+                // 第一个片段直接复制
+                System.arraycopy(chunk, 0, result, offset, chunk.length);
+                offset += chunk.length;
+            } else {
+                // 后续片段需要与前一个片段进行平滑过渡
+                int overlapStart = Math.max(0, offset - overlapBytes);
+                int overlapLength = Math.min(overlapBytes, offset - overlapStart);
+                
+                if (overlapLength > 0 && chunk.length > 0) {
+                    // 在重叠区域应用线性交叉淡变
+                    for (int j = 0; j < overlapLength; j += 2) {
+                        // 计算淡变权重
+                        float weight = (float)j / overlapLength;
+                        
+                        // 获取重叠区域的样本
+                        short sample1 = (short)((result[overlapStart + j] & 0xFF) | ((result[overlapStart + j + 1] & 0xFF) << 8));
+                        short sample2 = (short)((chunk[j] & 0xFF) | ((chunk[j + 1] & 0xFF) << 8));
+                        
+                        // 线性混合
+                        short mixed = (short)((1 - weight) * sample1 + weight * sample2);
+                        
+                        // 写回结果
+                        result[overlapStart + j] = (byte)(mixed & 0xFF);
+                        result[overlapStart + j + 1] = (byte)((mixed >> 8) & 0xFF);
+                    }
+                    
+                    // 复制剩余部分
+                    System.arraycopy(chunk, overlapLength, result, offset, chunk.length - overlapLength);
+                    offset += (chunk.length - overlapLength);
+                } else {
+                    // 没有足够的重叠，直接复制
+                    System.arraycopy(chunk, 0, result, offset, chunk.length);
+                    offset += chunk.length;
+                }
+            }
+        }
+        
+        // 如果实际长度小于预分配长度，则裁剪
+        if (offset < totalLength) {
+            byte[] trimmed = new byte[offset];
+            System.arraycopy(result, 0, trimmed, 0, offset);
+            return trimmed;
+        }
+        
+        return result;
     }
 
     /**
@@ -486,7 +627,7 @@ public class OpusProcessor {
         return decoders.computeIfAbsent(sid, k -> {
             try {
                 OpusDecoder decoder = new OpusDecoder(SAMPLE_RATE, CHANNELS);
-                decoder.setGain(0);
+                decoder.setGain(3);
                 return decoder;
             } catch (OpusException e) {
                 logger.error("创建解码器失败", e);
@@ -508,9 +649,9 @@ public class OpusProcessor {
     }
 
     /**
-     * PCM转Opus
+     * PCM转Opus - 改进版，支持残留数据处理
      */
-    public List<byte[]> pcmToOpus(String sid, byte[] pcm) throws OpusException {
+    public List<byte[]> pcmToOpus(String sid, byte[] pcm, boolean isStream) {
         if (pcm == null || pcm.length == 0) {
             return new ArrayList<>();
         }
@@ -522,7 +663,7 @@ public class OpusProcessor {
         }
 
         // 每帧样本数
-        int frameSize = (SAMPLE_RATE * FRAME_MS) / 1000;
+        int frameSize = FRAME_SIZE;
 
         // 获取编码器
         OpusEncoder encoder = getEncoder(sid, SAMPLE_RATE, CHANNELS);
@@ -530,56 +671,130 @@ public class OpusProcessor {
         // 处理PCM
         List<byte[]> frames = new ArrayList<>();
 
+        // 获取残留数据状态
+        LeftoverState state = getLeftoverState(sid);
+
         // 字节序处理
-        ByteBuffer pcmBuf = ByteBuffer.wrap(pcm, 0, pcmLen);
-        pcmBuf.order(ByteOrder.LITTLE_ENDIAN);
-        ShortBuffer shorts = pcmBuf.asShortBuffer();
+        ByteBuffer pcmBuf = ByteBuffer.wrap(pcm, 0, pcmLen).order(ByteOrder.LITTLE_ENDIAN);
+        ShortBuffer inputShorts = pcmBuf.asShortBuffer();
+        int totalInputSamples = inputShorts.remaining();
 
-        int totalShorts = pcmLen / 2;
-        int frameCount = (totalShorts + frameSize - 1) / frameSize;
-
+        // 合并残留数据与当前输入
+        short[] combined;
         // 缓冲区
         short[] shortBuf = new short[frameSize];
         byte[] opusBuf = new byte[MAX_SIZE];
 
-        logger.debug("PCM转Opus: 样本数={}, 帧大小={}, 帧数={}, 采样率={}Hz, 帧时长={}ms",
-                totalShorts, frameSize, frameCount, SAMPLE_RATE, FRAME_MS);
+        if (isStream) {
+            if (state.leftoverCount > 0 || !state.isFirst) {
+                combined = new short[state.leftoverCount + totalInputSamples];
+                System.arraycopy(state.leftoverBuffer, 0, combined, 0, state.leftoverCount);
+                inputShorts.get(combined, state.leftoverCount, totalInputSamples);
+            } else {
+                combined = new short[totalInputSamples];
+                inputShorts.get(combined);
+                // 如果是流式第一次处理数据，添加预热帧
+                if (state.isFirst) {
+                    addPreWarmFrames(frames, encoder, frameSize, opusBuf);
+                    state.isFirst = false;
+                }
+            }
+        } else {
+            combined = new short[totalInputSamples];
+            inputShorts.get(combined);
+            addPreWarmFrames(frames, encoder, frameSize, opusBuf);
+        }
 
-        for (int i = 0; i < frameCount; i++) {
-            // 当前帧起始位置
-            int start = i * frameSize;
+        int availableSamples = combined.length;
+        int frameCount = availableSamples / frameSize;
+        int remainingSamples = availableSamples % frameSize;
 
-            // 当前帧样本数
-            int samples = Math.min(frameSize, totalShorts - start);
+        // 处理第一帧 - 如果是新的音频段，应用淡入效果
+        if (frameCount > 0 && state.isFirst) {
+            System.arraycopy(combined, 0, shortBuf, 0, frameSize);
 
-            // 重置缓冲区
-            Arrays.fill(shortBuf, (short) 0);
+            // 应用淡入效果 - 前20毫秒（大约320个样本）
+            int fadeInSamples = Math.min(320, frameSize);
+            for (int i = 0; i < fadeInSamples; i++) {
+                // 线性淡入
+                float gain = (float) i / fadeInSamples;
+                shortBuf[i] = (short) (shortBuf[i] * gain);
+            }
 
-            // 读取样本
-            if (start < totalShorts) {
-                shorts.position(start);
-                int actual = Math.min(samples, shorts.remaining());
-                shorts.get(shortBuf, 0, actual);
+            try {
+                int opusLen = encoder.encode(shortBuf, 0, frameSize, opusBuf, 0, opusBuf.length);
+                if (opusLen > 0) {
+                    frames.add(Arrays.copyOf(opusBuf, opusLen));
+                }
+            } catch (OpusException e) {
+                logger.warn("淡入帧编码失败: {}", e.getMessage());
+            }
 
+            // 处理剩余的完整帧
+            for (int i = 1; i < frameCount; i++) {
+                int start = i * frameSize;
+                System.arraycopy(combined, start, shortBuf, 0, frameSize);
                 try {
-                    // 编码
                     int opusLen = encoder.encode(shortBuf, 0, frameSize, opusBuf, 0, opusBuf.length);
-
                     if (opusLen > 0) {
-                        // 创建帧
-                        byte[] frame = new byte[opusLen];
-                        System.arraycopy(opusBuf, 0, frame, 0, opusLen);
-                        frames.add(frame);
-                    } else {
-                        logger.warn("帧 #{} 编码长度为零", i);
+                        frames.add(Arrays.copyOf(opusBuf, opusLen));
                     }
                 } catch (OpusException e) {
                     logger.warn("帧 #{} 编码失败: {}", i, e.getMessage());
                 }
             }
+        } else {
+            // 处理所有完整帧
+            for (int i = 0; i < frameCount; i++) {
+                int start = i * frameSize;
+                System.arraycopy(combined, start, shortBuf, 0, frameSize);
+                try {
+                    int opusLen = encoder.encode(shortBuf, 0, frameSize, opusBuf, 0, opusBuf.length);
+                    if (opusLen > 0) {
+                        frames.add(Arrays.copyOf(opusBuf, opusLen));
+                    }
+                } catch (Exception e) {
+                    logger.warn("帧 #{} 编码失败: {}", i, e.getMessage());
+                }
+            }
         }
 
+        if (isStream) {
+            // 缓存剩余样本
+            state.leftoverCount = remainingSamples;
+            if (remainingSamples > 0) {
+                if (state.leftoverBuffer.length < remainingSamples) {
+                    state.leftoverBuffer = new short[frameSize]; // 确保缓冲区足够大
+                }
+                System.arraycopy(combined, frameCount * frameSize, state.leftoverBuffer, 0, remainingSamples);
+            } else {
+                Arrays.fill(state.leftoverBuffer, (short) 0); // 清空
+            }
+        }
         return frames;
+    }
+
+    /**
+     * 添加预热帧 - 解决开头破音问题
+     */
+    private void addPreWarmFrames(List<byte[]> frames, OpusEncoder encoder, int frameSize, byte[] opusBuf) {
+        // 创建静音帧
+        short[] silenceBuf = new short[frameSize];
+        Arrays.fill(silenceBuf, (short) 0);
+
+        // 添加几个静音帧来预热编码器
+        for (int i = 0; i < PRE_WARM_FRAMES; i++) {
+            try {
+                int opusLen = encoder.encode(silenceBuf, 0, frameSize, opusBuf, 0, opusBuf.length);
+                if (opusLen > 0) {
+                    byte[] frame = new byte[frameSize];
+                    System.arraycopy(opusBuf, 0, frame, 0, frameSize);
+                    frames.add(frame);
+                }
+            } catch (OpusException e) {
+                logger.warn("预热帧 #{} 编码失败: {}", i, e.getMessage());
+            }
+        }
     }
 
     /**
@@ -588,6 +803,7 @@ public class OpusProcessor {
     public void cleanup(String sid) {
         decoders.remove(sid);
         overlaps.remove(sid);
+        leftoverStates.remove(sid); // 清理残留数据状态
 
         // 清理编码器
         List<String> toRemove = new ArrayList<>();
@@ -606,19 +822,19 @@ public class OpusProcessor {
      * 获取编码器
      */
     private OpusEncoder getEncoder(String sid, int rate, int channels) {
-        String key = sid + "_" + rate + "_" + channels;
-        return encoders.computeIfAbsent(key, k -> {
+        return encoders.computeIfAbsent(sid, k -> {
             try {
                 OpusEncoder encoder = new OpusEncoder(rate, channels, OpusApplication.OPUS_APPLICATION_VOIP);
 
                 // 优化设置
                 encoder.setBitrate(AudioUtils.BITRATE);
+                // 这里后续看是不是要针对音乐做一个切换
                 encoder.setSignalType(OpusSignal.OPUS_SIGNAL_VOICE);
-                encoder.setComplexity(7);
-                encoder.setPacketLossPercent(5);
+                encoder.setComplexity(5); // 复杂度高音质好，低速度快
+                encoder.setPacketLossPercent(0); // 降低丢包补偿，减少处理延迟
                 encoder.setForceChannels(channels);
-                encoder.setUseVBR(false);
-                encoder.setUseDTX(false);
+                encoder.setUseVBR(false); // 使用CBR模式确保稳定的比特率
+                encoder.setUseDTX(false); // 禁用DTX以确保连续的帧
 
                 return encoder;
             } catch (OpusException e) {
@@ -636,5 +852,6 @@ public class OpusProcessor {
         decoders.clear();
         encoders.clear();
         overlaps.clear();
+        leftoverStates.clear(); // 清理所有残留数据状态
     }
 }

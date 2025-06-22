@@ -33,7 +33,7 @@
                 AND sys_message.messageType = #{messageType}
             </if>
             <if test="deviceName != null and deviceName != ''">
-                AND sys_message.deviceName = #{deviceName}
+                AND sys_device.deviceName = #{deviceName}
             </if>
             <if test="startTime != null and startTime != ''">
                 AND sys_message.createTime &gt;= #{startTime} AND sys_message.createTime &lt;= #{endTime}

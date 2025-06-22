@@ -1,22 +1,18 @@
-# 使用Alpine作为基础镜像，大大减小体积
-FROM alpine:3.16 AS builder
+# Use Eclipse Temurin for both build and runtime stages
+FROM eclipse-temurin:21-jdk AS builder
 
 # 添加构建参数，默认使用标准模型
 ARG VOSK_MODEL_SIZE=standard
 
-# 安装必要的构建工具，使用Alpine的包管理器
-RUN apk add --no-cache openjdk8 maven wget unzip curl
+# 安装必要的构建工具
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    maven \
+    wget \
+    unzip \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-
-# 手动下载并安装TarsosDSP依赖
-RUN mkdir -p /root/.m2/repository/be/tarsos/dsp/core/2.5/ && \
-    mkdir -p /root/.m2/repository/be/tarsos/dsp/jvm/2.5/ && \
-    curl -L -o /root/.m2/repository/be/tarsos/dsp/core/2.5/core-2.5.jar https://github.com/JorenSix/TarsosDSP/raw/master/build/tarsos.dsp-2.5.jar && \
-    curl -L -o /root/.m2/repository/be/tarsos/dsp/jvm/2.5/jvm-2.5.jar https://github.com/JorenSix/TarsosDSP/raw/master/build/tarsos.dsp-2.5.jar && \
-    # 创建POM文件
-    echo '<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><groupId>be.tarsos.dsp</groupId><artifactId>core</artifactId><version>2.5</version></project>' > /root/.m2/repository/be/tarsos/dsp/core/2.5/core-2.5.pom && \
-    echo '<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><modelVersion>4.0.0</modelVersion><groupId>be.tarsos.dsp</groupId><artifactId>jvm</artifactId><version>2.5</version></project>' > /root/.m2/repository/be/tarsos/dsp/jvm/2.5/jvm-2.5.pom
 
 # 复制源代码
 COPY ./src ./src
@@ -62,8 +58,8 @@ RUN mkdir -p /vosk_cache && \
         cp -r /vosk_cache/vosk-model-cn-0.22 /build/models/vosk-model; \
     fi
 
-# 使用基于Debian的JRE镜像，而不是Alpine
-FROM eclipse-temurin:8-jre
+# 使用更小的JRE镜像作为运行时环境
+FROM eclipse-temurin:21-jre
 
 # 安装必要的运行时依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \

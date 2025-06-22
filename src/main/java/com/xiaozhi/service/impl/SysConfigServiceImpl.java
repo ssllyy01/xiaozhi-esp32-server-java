@@ -1,10 +1,15 @@
 package com.xiaozhi.service.impl;
 
 import com.github.pagehelper.PageHelper;
+import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.dao.ConfigMapper;
+import com.xiaozhi.dialogue.stt.factory.SttServiceFactory;
+import com.xiaozhi.dialogue.tts.factory.TtsServiceFactory;
 import com.xiaozhi.entity.SysConfig;
 import com.xiaozhi.service.SysConfigService;
-
+import jakarta.annotation.Resource;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,8 +17,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import javax.annotation.Resource;
 
 /**
  * 模型配置
@@ -23,19 +26,26 @@ import javax.annotation.Resource;
  */
 
 @Service
-public class SysConfigServiceImpl implements SysConfigService {
+public class SysConfigServiceImpl extends BaseServiceImpl implements SysConfigService {
+    private final static String CACHE_NAME = "XiaoZhi:SysConfig";
 
     @Resource
     private ConfigMapper configMapper;
 
+    @Resource
+    private SttServiceFactory sttServiceFactory;
+
+    @Resource
+    private TtsServiceFactory ttsServiceFactory;
+
     /**
      * 添加配置
      * 
-     * @param SysConfig
+     * @param config
      * @return
      */
     @Override
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public int add(SysConfig config) {
         // 如果当前配置被设置为默认，则将同类型同用户的其他配置设置为非默认
         if (config.getIsDefault() != null && config.getIsDefault().equals("1")) {
@@ -47,17 +57,23 @@ public class SysConfigServiceImpl implements SysConfigService {
     /**
      * 修改配置
      * 
-     * @param SysConfig
+     * @param config
      * @return
      */
     @Override
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
+    @CacheEvict(value = CACHE_NAME, key = "#config.configId")
     public int update(SysConfig config) {
         // 如果当前配置被设置为默认，则将同类型同用户的其他配置设置为非默认
         if (config.getIsDefault() != null && config.getIsDefault().equals("1")) {
             resetDefaultConfig(config);
         }
-        return configMapper.update(config);
+        int rows = configMapper.update(config);
+        if (rows > 0) {
+            sttServiceFactory.removeCache(config);
+            ttsServiceFactory.removeCache(config);
+        }
+        return rows;
     }
 
     /**
@@ -81,10 +97,9 @@ public class SysConfigServiceImpl implements SysConfigService {
      * @return
      */
     @Override
-    @Transactional
-    public List<SysConfig> query(SysConfig config) {
-        if (config.getLimit() != null && config.getLimit() > 0) {
-            PageHelper.startPage(config.getStart(), config.getLimit());
+    public List<SysConfig> query(SysConfig config, PageFilter pageFilter) {
+        if(pageFilter != null){
+            PageHelper.startPage(pageFilter.getStart(), pageFilter.getLimit());
         }
         // 这里为了适配阿里云的 Token 刷新，返回的结果会有重复
         List<SysConfig> configs = configMapper.query(config);
@@ -98,10 +113,11 @@ public class SysConfigServiceImpl implements SysConfigService {
     /**
      * 查询配置
      * 
-     * @param configId
-     * @return
+     * @param configId 配置id
+     * @return 具体的配置
      */
     @Override
+    @Cacheable(value = CACHE_NAME, key = "#configId", unless = "#result == null")
     public SysConfig selectConfigById(Integer configId) {
         return configMapper.selectConfigById(configId);
     }

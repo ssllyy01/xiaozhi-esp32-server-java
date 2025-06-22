@@ -1,12 +1,10 @@
 package com.xiaozhi.controller;
 
-import java.util.Map;
-
-import javax.annotation.Resource;
-
+import com.github.pagehelper.PageInfo;
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
 import com.xiaozhi.common.exception.UsernameNotFoundException;
 import com.xiaozhi.common.web.AjaxResult;
+import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.common.web.SessionProvider;
 import com.xiaozhi.entity.SysUser;
 import com.xiaozhi.security.AuthenticationService;
@@ -14,23 +12,19 @@ import com.xiaozhi.service.SysDeviceService;
 import com.xiaozhi.service.SysUserService;
 import com.xiaozhi.utils.CmsUtils;
 import com.xiaozhi.utils.ImageUtils;
-
 import io.github.biezhi.ome.OhMyEmail;
-import static io.github.biezhi.ome.OhMyEmail.SMTP_QQ;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.bind.annotation.*;
 
-import reactor.core.publisher.Mono;
+import java.util.List;
+import java.util.Map;
+
+import static io.github.biezhi.ome.OhMyEmail.SMTP_QQ;
 
 /**
  * 用户信息
@@ -40,9 +34,7 @@ import reactor.core.publisher.Mono;
  */
 @RestController
 @RequestMapping("/api/user")
-public class UserController {
-
-    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+public class UserController extends BaseController {
 
     @Resource
     private SysUserService userService;
@@ -63,14 +55,14 @@ public class UserController {
     private String emailPassword;
 
     /**
-     * @param username
-     * @param password
-     * @return
+     * @param loginRequest 包含用户名和密码的请求体
+     * @return 登录结果
      * @throws UsernameNotFoundException
      * @throws UserPasswordNotMatchException
      */
     @PostMapping("/login")
-    public Mono<AjaxResult> login(@RequestBody Map<String, Object> loginRequest, ServerWebExchange exchange) {
+    @ResponseBody
+    public AjaxResult login(@RequestBody Map<String, Object> loginRequest, HttpServletRequest request) {
         try {
             String username = (String) loginRequest.get("username");
             String password = (String) loginRequest.get("password");
@@ -78,29 +70,33 @@ public class UserController {
             userService.login(username, password);
             SysUser user = userService.query(username);
 
+            // 保存用户到会话
+            HttpSession session = request.getSession();
+            session.setAttribute(SysUserService.USER_SESSIONKEY, user);
+            
             // 保存用户
-            CmsUtils.setUser(exchange, user);
+            CmsUtils.setUser(request, user);
 
-            return sessionProvider.setAttribute(exchange, SysUserService.USER_SESSIONKEY, user)
-                    .thenReturn(AjaxResult.success(user));
+            return AjaxResult.success(user);
         } catch (UsernameNotFoundException e) {
-            return Mono.just(AjaxResult.error("用户不存在"));
+            return AjaxResult.error("用户不存在");
         } catch (UserPasswordNotMatchException e) {
-            return Mono.just(AjaxResult.error("密码错误"));
+            return AjaxResult.error("密码错误");
         } catch (Exception e) {
             logger.info(e.getMessage(), e);
-            return Mono.just(AjaxResult.error("操作失败"));
+            return AjaxResult.error("操作失败");
         }
     }
 
     /**
      * 新增用户
      * 
-     * @param user
-     * @return
+     * @param loginRequest 包含用户信息的请求体
+     * @return 添加结果
      */
     @PostMapping("/add")
-    public Mono<AjaxResult> add(@RequestBody Map<String, Object> loginRequest, ServerWebExchange exchange) {
+    @ResponseBody
+    public AjaxResult add(@RequestBody Map<String, Object> loginRequest, HttpServletRequest request) {
         try {
             String username = (String) loginRequest.get("username");
             String email = (String) loginRequest.get("email");
@@ -108,9 +104,11 @@ public class UserController {
             String code = (String) loginRequest.get("code");
             String name = (String) loginRequest.get("name");
             String tel = (String) loginRequest.get("tel");
+            
             int row = userService.queryCaptcha(code, email);
             if (1 > row)
-                return Mono.just(AjaxResult.error("无效验证码"));
+                return AjaxResult.error("无效验证码");
+                
             SysUser user = new SysUser();
             user.setUsername(username);
             user.setEmail(email);
@@ -118,138 +116,164 @@ public class UserController {
             user.setTel(tel);
             String newPassword = authenticationService.encryptPassword(password);
             user.setPassword(newPassword);
+            
             if (0 < userService.add(user)) {
-                return Mono.just(AjaxResult.success(user));
+                return AjaxResult.success(user);
             }
-            return Mono.just(AjaxResult.error());
+            return AjaxResult.error();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return Mono.just(AjaxResult.error());
+            return AjaxResult.error();
         }
     }
 
     /**
      * 用户信息查询
      * 
-     * @param username
-     * @return
+     * @param username 用户名
+     * @return 用户信息
      */
     @GetMapping("/query")
-    public Mono<AjaxResult> query(String username) {
+    @ResponseBody
+    public AjaxResult query(String username) {
         try {
             SysUser user = userService.query(username);
             AjaxResult result = AjaxResult.success();
             result.put("data", user);
-            return Mono.just(result);
+            return result;
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return Mono.just(AjaxResult.error());
+            return AjaxResult.error();
+        }
+    }
+
+    /**
+     * 查询用户列表
+     * 
+     * @param user 查询条件
+     * @return 用户列表
+     */
+    @GetMapping("/queryUsers")
+    @ResponseBody
+    public AjaxResult queryUsers(SysUser user, HttpServletRequest request) {
+        try {
+            PageFilter pageFilter = initPageFilter(request);
+            List<SysUser> users = userService.queryUsers(user, pageFilter);
+            AjaxResult result = AjaxResult.success();
+            result.put("data", new PageInfo<>(users));
+            return result;
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            return AjaxResult.error();
         }
     }
 
     /**
      * 用户信息修改
      *
-     * @param user
-     * @return
+     * @param loginRequest 包含用户信息的请求体
+     * @return 修改结果
      */
     @PostMapping("/update")
-    public Mono<AjaxResult> update(@RequestBody Map<String, Object> loginRequest, ServerWebExchange exchange) {
+    @ResponseBody
+    public AjaxResult update(@RequestBody Map<String, Object> loginRequest) {
         try {
             String username = (String) loginRequest.get("username");
             String email = (String) loginRequest.get("email");
             String password = (String) loginRequest.get("password");
             String name = (String) loginRequest.get("name");
             String avatar = (String) loginRequest.get("avatar");
+            
             SysUser userQuery = new SysUser();
             if (StringUtils.hasText(username)) {
                 userQuery = userService.selectUserByUsername(username);
             } else if (StringUtils.hasText(email)) {
                 userQuery = userService.selectUserByEmail(email);
             }
+            
             if (ObjectUtils.isEmpty(userQuery)) {
-                return Mono.just(AjaxResult.error("无此用户，操作失败"));
+                return AjaxResult.error("无此用户，操作失败");
             }
+            
             if (StringUtils.hasText(password)) {
                 String newPassword = authenticationService.encryptPassword(password);
                 userQuery.setPassword(newPassword);
             }
+            
             if (!StringUtils.hasText(avatar) && StringUtils.hasText(name)) {
                 userQuery.setAvatar(ImageUtils.GenerateImg(name));
             }
 
             if (0 < userService.update(userQuery)) {
-                return Mono.just(AjaxResult.success());
+                return AjaxResult.success();
             }
-            return Mono.just(AjaxResult.error());
+            return AjaxResult.error();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return Mono.just(AjaxResult.error());
+            return AjaxResult.error();
         }
     }
 
     /**
      * 邮箱验证码发送
      *
-     * @param email
-     * @return
+     * @param requestBody 包含邮箱和类型的请求体
+     * @return 发送结果
      */
     @PostMapping("/sendEmailCaptcha")
-    public Mono<AjaxResult> sendEmailCaptcha(@RequestBody(required = false) Map<String, Object> requestBody,
-            ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                String email = (String) requestBody.get("email");
-                String type = (String) requestBody.get("type");
+    @ResponseBody
+    public AjaxResult sendEmailCaptcha(@RequestBody(required = false) Map<String, Object> requestBody,
+            HttpServletRequest request) {
+        try {
+            String email = (String) requestBody.get("email");
+            String type = (String) requestBody.get("type");
 
-                // 验证邮箱格式
-                if (!isValidEmail(email)) {
-                    return AjaxResult.error("邮箱格式不正确");
-                }
-
-                SysUser user = userService.selectUserByEmail(email);
-                if ("forget".equals(type) && ObjectUtils.isEmpty(user)) {
-                    return AjaxResult.error("该邮箱未注册");
-                }
-
-                SysUser code = userService.generateCode(new SysUser().setEmail(email));
-                String emailContent = "尊敬的用户您好!您的验证码为:<h3>" + code.getCode() + "</h3>如不是您操作,请忽略此邮件.(有效期10分钟)";
-
-                // 需要配置自己的第三方邮箱认证信息，这里用的QQ邮箱认证信息，需自己申请
-                if (!StringUtils.hasText(emailUsername) || !StringUtils.hasText(emailPassword)) {
-                    return AjaxResult.error("未配置第三方邮箱认证信息,请联系管理员");
-                }
-
-                // 配置邮件发送
-                OhMyEmail.config(SMTP_QQ(false), emailUsername, emailPassword);
-
-                // 发送邮件
-                OhMyEmail.subject("小智ESP32-智能物联网管理平台")
-                        .from("小智物联网管理平台")
-                        .to(email)
-                        .html(emailContent)
-                        .send();
-
-                return AjaxResult.success();
-            } catch (Exception e) {
-
-                // 根据异常类型返回不同的错误信息
-                String errorMsg = "发送失败";
-                if (e.getMessage() != null) {
-                    if (e.getMessage().contains("non-existent account") ||
-                            e.getMessage().contains("550") ||
-                            e.getMessage().contains("recipient")) {
-                        errorMsg = "邮箱地址不存在或无效";
-                    } else if (e.getMessage().contains("Authentication failed")) {
-                        errorMsg = "邮箱服务认证失败，请联系管理员";
-                    } else if (e.getMessage().contains("timed out")) {
-                        errorMsg = "邮件发送超时，请稍后重试";
-                    }
-                }
-
-                return AjaxResult.error(errorMsg);
+            // 验证邮箱格式
+            if (!isValidEmail(email)) {
+                return AjaxResult.error("邮箱格式不正确");
             }
-        });
+
+            SysUser user = userService.selectUserByEmail(email);
+            if ("forget".equals(type) && ObjectUtils.isEmpty(user)) {
+                return AjaxResult.error("该邮箱未注册");
+            }
+
+            SysUser code = userService.generateCode(new SysUser().setEmail(email));
+            String emailContent = "尊敬的用户您好!您的验证码为:<h3>" + code.getCode() + "</h3>如不是您操作,请忽略此邮件.(有效期10分钟)";
+
+            // 需要配置自己的第三方邮箱认证信息，这里用的QQ邮箱认证信息，需自己申请
+            if (!StringUtils.hasText(emailUsername) || !StringUtils.hasText(emailPassword)) {
+                return AjaxResult.error("未配置第三方邮箱认证信息,请联系管理员");
+            }
+
+            // 配置邮件发送
+            OhMyEmail.config(SMTP_QQ(false), emailUsername, emailPassword);
+
+            // 发送邮件
+            OhMyEmail.subject("小智ESP32-智能物联网管理平台")
+                    .from("小智物联网管理平台")
+                    .to(email)
+                    .html(emailContent)
+                    .send();
+
+            return AjaxResult.success();
+        } catch (Exception e) {
+            // 根据异常类型返回不同的错误信息
+            String errorMsg = "发送失败";
+            if (e.getMessage() != null) {
+                if (e.getMessage().contains("non-existent account") ||
+                        e.getMessage().contains("550") ||
+                        e.getMessage().contains("recipient")) {
+                    errorMsg = "邮箱地址不存在或无效";
+                } else if (e.getMessage().contains("Authentication failed")) {
+                    errorMsg = "邮箱服务认证失败，请联系管理员";
+                } else if (e.getMessage().contains("timed out")) {
+                    errorMsg = "邮件发送超时，请稍后重试";
+                }
+            }
+
+            return AjaxResult.error(errorMsg);
+        }
     }
 
     /**
@@ -269,26 +293,35 @@ public class UserController {
     /**
      * 验证验证码是否有效
      *
-     * @param captcha
-     * @param email
-     * @return
+     * @param code 验证码
+     * @param email 邮箱
+     * @return 验证结果
      */
     @GetMapping("/checkCaptcha")
-    public Mono<AjaxResult> checkCaptcha(String code, String email) {
-        return Mono.fromCallable(() -> {
+    @ResponseBody
+    public AjaxResult checkCaptcha(String code, String email) {
+        try {
             int row = userService.queryCaptcha(code, email);
             if (1 > row)
                 return AjaxResult.error("无效验证码");
             return AjaxResult.success();
-        }).onErrorResume(e -> {
+        } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return Mono.just(AjaxResult.error("操作失败,请联系管理员"));
-        });
+            return AjaxResult.error("操作失败,请联系管理员");
+        }
     }
 
+    /**
+     * 检查用户名和邮箱是否已存在
+     *
+     * @param username 用户名
+     * @param email 邮箱
+     * @return 检查结果
+     */
     @GetMapping("/checkUser")
-    public Mono<AjaxResult> checkUser(String username, String email) {
-        return Mono.fromCallable(() -> {
+    @ResponseBody
+    public AjaxResult checkUser(String username, String email) {
+        try {
             SysUser userName = userService.selectUserByUsername(username);
             SysUser userEmail = userService.selectUserByEmail(email);
             if (!ObjectUtils.isEmpty(userName)) {
@@ -297,9 +330,9 @@ public class UserController {
                 return AjaxResult.error("邮箱已注册");
             }
             return AjaxResult.success();
-        }).onErrorResume(e -> {
+        } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return Mono.just(AjaxResult.error("操作失败,请联系管理员"));
-        });
+            return AjaxResult.error("操作失败,请联系管理员");
+        }
     }
 }

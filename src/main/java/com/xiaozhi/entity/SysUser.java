@@ -1,6 +1,5 @@
 package com.xiaozhi.entity;
 
-import java.io.Serializable;
 import java.util.Date;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -13,7 +12,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * 
  */
 @JsonIgnoreProperties({ "password", "startTime", "endTime", "start" })
-public class SysUser extends Base implements Serializable {
+public class SysUser extends Base {
 
     /**
      * serialVersionUID
@@ -215,6 +214,14 @@ public class SysUser extends Base implements Serializable {
     public SysUser setCode(String code) {
         this.code = code;
         return this;
+    }
+
+    @Override
+    public String toString() {
+        return "SysUser [username=" + username + ", password=" + password + ", name=" + name + ", totalMessage="
+                + totalMessage + ", aliveNumber=" + aliveNumber + ", totalDevice=" + totalDevice + ", avatar=" + avatar
+                + ", state=" + state + ", isAdmin=" + isAdmin + ", tel=" + tel + ", email=" + email + ", loginIp="
+                + loginIp + ", code=" + code + ", loginTime=" + loginTime + "]";
     }
 
 }

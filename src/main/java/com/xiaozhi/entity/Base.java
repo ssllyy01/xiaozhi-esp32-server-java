@@ -1,9 +1,9 @@
 package com.xiaozhi.entity;
 
-import java.util.Date;
-
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import java.util.Date;
 
 /**
  * 基础实体类
@@ -12,15 +12,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * 
  */
 @JsonIgnoreProperties({ "start", "limit", "userId", "startTime", "endTime" })
-public class Base {
-
-    /**
-     * 分页
-     */
-    private Integer start;
-
-    private Integer limit;
-
+public class Base implements java.io.Serializable {
     /**
      * 创建日期
      */
@@ -38,24 +30,6 @@ public class Base {
     private String startTime;
 
     private String endTime;
-
-    public Integer getStart() {
-        return start;
-    }
-
-    public Base setStart(Integer start) {
-        this.start = start;
-        return this;
-    }
-
-    public Integer getLimit() {
-        return limit;
-    }
-
-    public Base setLimit(Integer limit) {
-        this.limit = limit;
-        return this;
-    }
 
     public Integer getUserId() {
         return userId;

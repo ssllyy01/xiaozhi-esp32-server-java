@@ -1,32 +1,32 @@
 package com.xiaozhi.utils;
 
-import java.io.ByteArrayInputStream;
+import org.bytedeco.ffmpeg.global.avutil;
+import org.bytedeco.javacv.FrameRecorder;
+import org.slf4j.Logger;
+
 import java.io.DataOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
-
-import org.bytedeco.ffmpeg.global.avcodec;
-import org.bytedeco.ffmpeg.global.avutil;
-import org.bytedeco.javacv.FFmpegFrameRecorder;
-import org.bytedeco.javacv.Frame;
-import org.bytedeco.javacv.FrameRecorder;
-import org.slf4j.Logger;
 
 public class AudioUtils {
     public static final String AUDIO_PATH = "audio/";
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(AudioUtils.class);
+    public static final int FRAME_SIZE = 960;
     public static final int SAMPLE_RATE = 16000; // 采样率
     public static final int CHANNELS = 1; // 单声道
-    public static final int BITRATE = 160000; // 160kbps比特率
+    public static final int BITRATE = 24000; // 24kbps比特率
     public static final int SAMPLE_FORMAT = avutil.AV_SAMPLE_FMT_S16; // 16位PCM
+    public static final int OPUS_FRAME_DURATION_MS = 60; // OPUS帧持续时间（毫秒）
 
     /**
      * 将原始音频数据保存为MP3文件
-     * 
+     *
      * @param audio PCM音频数据
      * @return 文件名
      */
@@ -105,8 +105,8 @@ public class AudioUtils {
 
     /**
      * 将原始音频数据保存为WAV文件
-     * 
-     * @param audio 音频数据
+     *
+     * @param audioData 音频数据
      * @return 文件名
      */
     public static String saveAsWav(byte[] audioData) {
@@ -116,32 +116,37 @@ public class AudioUtils {
         // WAV文件参数
         int bitsPerSample = 16; // 16位采样
 
-        try (FileOutputStream fos = new FileOutputStream(filePath);
-                DataOutputStream dos = new DataOutputStream(fos)) {
+        try {
+            // 确保音频目录存在
+            Files.createDirectories(Paths.get(AUDIO_PATH));
 
-            // 写入WAV文件头
-            // RIFF头
-            dos.writeBytes("RIFF");
-            dos.writeInt(Integer.reverseBytes(36 + audioData.length)); // 文件长度
-            dos.writeBytes("WAVE");
+            try (FileOutputStream fos = new FileOutputStream(filePath);
+                 DataOutputStream dos = new DataOutputStream(fos)) {
 
-            // fmt子块
-            dos.writeBytes("fmt ");
-            dos.writeInt(Integer.reverseBytes(16)); // 子块大小
-            dos.writeShort(Short.reverseBytes((short) 1)); // 音频格式 (1 = PCM)
-            dos.writeShort(Short.reverseBytes((short) CHANNELS)); // 通道数
-            dos.writeInt(Integer.reverseBytes(SAMPLE_RATE)); // 采样率
-            dos.writeInt(Integer.reverseBytes(SAMPLE_RATE * CHANNELS * bitsPerSample / 8)); // 字节率
-            dos.writeShort(Short.reverseBytes((short) (CHANNELS * bitsPerSample / 8))); // 块对齐
-            dos.writeShort(Short.reverseBytes((short) bitsPerSample)); // 每个样本的位数
+                // 写入WAV文件头
+                // RIFF头
+                dos.writeBytes("RIFF");
+                dos.writeInt(Integer.reverseBytes(36 + audioData.length)); // 文件长度
+                dos.writeBytes("WAVE");
 
-            // data子块
-            dos.writeBytes("data");
-            dos.writeInt(Integer.reverseBytes(audioData.length)); // 数据大小
+                // fmt子块
+                dos.writeBytes("fmt ");
+                dos.writeInt(Integer.reverseBytes(16)); // 子块大小
+                dos.writeShort(Short.reverseBytes((short) 1)); // 音频格式 (1 = PCM)
+                dos.writeShort(Short.reverseBytes((short) CHANNELS)); // 通道数
+                dos.writeInt(Integer.reverseBytes(SAMPLE_RATE)); // 采样率
+                dos.writeInt(Integer.reverseBytes(SAMPLE_RATE * CHANNELS * bitsPerSample / 8)); // 字节率
+                dos.writeShort(Short.reverseBytes((short) (CHANNELS * bitsPerSample / 8))); // 块对齐
+                dos.writeShort(Short.reverseBytes((short) bitsPerSample)); // 每个样本的位数
 
-            // 写入音频数据
-            dos.write(audioData);
-            return fileName;
+                // data子块
+                dos.writeBytes("data");
+                dos.writeInt(Integer.reverseBytes(audioData.length)); // 数据大小
+
+                // 写入音频数据
+                dos.write(audioData);
+                return fileName;
+            }
         } catch (FrameRecorder.Exception e) {
             logger.error("编码MP3时发生错误", e);
         } catch (IOException e) {
@@ -151,8 +156,73 @@ public class AudioUtils {
     }
 
     /**
+     * 合并多个音频文件为一个WAV文件
+     * 支持合并的格式： wav, mp3, pcm
+     *
+     * @param audioPaths 要合并的音频文件路径列表
+     * @return 合并后的WAV文件名
+     */
+    public static String mergeAudioFiles(List<String> audioPaths) {
+        if (audioPaths.size() == 1) {
+            return Paths.get(audioPaths.getFirst()).getFileName().toString();
+        }
+        var uuid = UUID.randomUUID().toString().replace("-", "");
+        var outputFileName = uuid + ".wav";
+        var outputPath = Paths.get(AUDIO_PATH, outputFileName).toString();
+
+        try {
+            // 计算所有PCM数据的总大小
+            var totalPcmSize = 0L;
+            var audioChunks = new ArrayList<byte[]>();
+            for (var audioPath : audioPaths) {
+                var fullPath = audioPath.startsWith(AUDIO_PATH) ? audioPath : AUDIO_PATH + audioPath;
+                byte[] pcmData = readAsPcm(fullPath);
+                totalPcmSize += pcmData.length;
+                audioChunks.add(pcmData);
+            }
+
+            // 创建输出WAV文件
+            try (FileOutputStream fos = new FileOutputStream(outputPath);
+                 DataOutputStream dos = new DataOutputStream(fos)) {
+
+                // 写入WAV文件头
+                int bitsPerSample = 16; // 16位采样
+
+                // RIFF头
+                dos.writeBytes("RIFF");
+                dos.writeInt(Integer.reverseBytes(36 + (int) totalPcmSize)); // 文件长度
+                dos.writeBytes("WAVE");
+
+                // fmt子块
+                dos.writeBytes("fmt ");
+                dos.writeInt(Integer.reverseBytes(16)); // 子块大小
+                dos.writeShort(Short.reverseBytes((short) 1)); // 音频格式 (1 = PCM)
+                dos.writeShort(Short.reverseBytes((short) CHANNELS)); // 通道数
+                dos.writeInt(Integer.reverseBytes(SAMPLE_RATE)); // 采样率
+                dos.writeInt(Integer.reverseBytes(SAMPLE_RATE * CHANNELS * bitsPerSample / 8)); // 字节率
+                dos.writeShort(Short.reverseBytes((short) (CHANNELS * bitsPerSample / 8))); // 块对齐
+                dos.writeShort(Short.reverseBytes((short) bitsPerSample)); // 每个样本的位数
+
+                // data子块
+                dos.writeBytes("data");
+                dos.writeInt(Integer.reverseBytes((int) totalPcmSize)); // 数据大小
+
+                // 依次写入每个文件的PCM数据
+                for (var pcmData : audioChunks) {
+                    dos.write(pcmData);
+                }
+            }
+
+            return outputFileName;
+        } catch (Exception e) {
+            logger.error("合并音频文件时发生错误", e);
+            return null;
+        }
+    }
+
+    /**
      * 从WAV文件中提取PCM数据
-     * 
+     *
      * @param wavPath WAV文件路径
      * @return PCM数据字节数组
      */
@@ -164,7 +234,7 @@ public class AudioUtils {
 
     /**
      * 从WAV字节数据中提取PCM数据
-     * 
+     *
      * @param wavData WAV文件的字节数据
      * @return PCM数据字节数组
      */
@@ -204,7 +274,7 @@ public class AudioUtils {
 
     /**
      * 从文件读取PCM数据，自动处理WAV和MP3格式
-     * 
+     *
      * @param filePath 音频文件路径
      * @return PCM数据字节数组
      */
@@ -223,8 +293,8 @@ public class AudioUtils {
 
     /**
      * 将MP3转换为PCM格式
-     * 
-     * @param inputPath MP3文件路径
+     *
+     * @param mp3Path MP3文件路径
      * @return PCM数据字节数组
      */
     public static byte[] mp3ToPcm(String mp3Path) throws IOException {
@@ -278,7 +348,7 @@ public class AudioUtils {
 
     /**
      * 检测音频文件格式并返回MIME类型
-     * 
+     *
      * @param filePath 音频文件路径
      * @return MIME类型字符串
      */

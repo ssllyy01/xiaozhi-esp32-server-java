@@ -1,121 +1,164 @@
 # 变更日志
-## [2.7.37] - 2025-05-05
+## [2.8.7] - 2025-06-20
 
 ### 其他变更
-- chore: update version to 2.7.37 [skip ci]
+- chore: update version to 2.8.7 [skip ci]
+- docs: update changelog for v2.8.6 [skip ci]
+- chore: update version to 2.8.6 [skip ci]
 
-## [2.7.36] - 2025-05-03
-
-### 其他变更
-- chore: update version to 2.7.36 [skip ci]
-
-## [2.7.35] - 2025-05-01
+## [2.8.6] - 2025-06-19
 
 ### 其他变更
-- chore: update version to 2.7.35 [skip ci]
+- chore: update version to 2.8.6 [skip ci]
 
-## [2.7.34] - 2025-05-01
-
-### 其他变更
-- chore: update version to 2.7.34 [skip ci]
-
-## [2.7.33] - 2025-05-01
+## [2.8.5] - 2025-06-18
 
 ### 其他变更
-- chore: update version to 2.7.33 [skip ci]
-- docs: update changelog for v2.7.32 [skip ci]
-- chore: update version to 2.7.32 [skip ci]
-- test
+- chore: update version to 2.8.5 [skip ci]
 
-## [2.7.32] - 2025-05-01
+## [2.8.4] - 2025-06-17
 
 ### 其他变更
-- chore: update version to 2.7.32 [skip ci]
+- chore: update version to 2.8.4 [skip ci]
 
-## [2.7.31] - 2025-04-30
-
-### 其他变更
-- chore: update version to 2.7.31 [skip ci]
-
-## [2.7.30] - 2025-04-30
+## [2.8.3] - 2025-06-17
 
 ### 其他变更
-- chore: update version to 2.7.30 [skip ci]
+- chore: update version to 2.8.3 [skip ci]
 
-## [2.7.29] - 2025-04-30
-
-### 其他变更
-- chore: update version to 2.7.29 [skip ci]
-
-## [2.7.28] - 2025-04-28
+## [2.8.2] - 2025-06-16
 
 ### 其他变更
-- chore: update version to 2.7.28 [skip ci]
+- chore: update version to 2.8.2 [skip ci]
 
-## [2.7.27] - 2025-04-28
-
-### 其他变更
-- chore: update version to 2.7.27 [skip ci]
-
-## [2.7.26] - 2025-04-28
+## [2.8.1] - 2025-06-15
 
 ### 其他变更
-- chore: update version to 2.7.26 [skip ci]
+- chore: update version to 2.8.1 [skip ci]
 
-## [2.7.25] - 2025-04-26
+## [2.8.0] - 2025-06-15
 
 ### 新功能
-- Merge pull request #67 from breastcover/feat/compatible_mac_m1_chip
-- feat(llm): 添加智谱 LLM 支持
-- feat:vosk 兼容mac系统 m系列芯片
-
-### 其他变更
-- chore: update version to 2.7.25 [skip ci]
-- docs: update changelog for v2.7.24 [skip ci]
-- chore: update version to 2.7.24 [skip ci]
-- docs: update changelog for v2.7.23 [skip ci]
-- chore: update version to 2.7.23 [skip ci]
-
-## [2.7.24] - 2025-04-26
-
-### 新功能
-- feat(llm): 添加智谱 LLM 支持
-
-### 其他变更
-- chore: update version to 2.7.24 [skip ci]
-- docs: update changelog for v2.7.23 [skip ci]
-- chore: update version to 2.7.23 [skip ci]
-
-## [2.7.23] - 2025-04-26
-
-### 其他变更
-- chore: update version to 2.7.23 [skip ci]
-
-## [2.7.22] - 2025-04-25
-
-### 新功能
-- feat:消息删除功能与清空记忆功能
-
-### 其他变更
-## [2.7.23] - 2025-04-26
-
-### 新功能
-- fix:修复IP地址错误问题 feat:设备绑定自动应用默认设置
-- feat:新增默认配置，设定添加默认时，之后绑定的所有设备将全部自动应用该配置
+- feat:增加logback输入 close #37
+- feat:新增橘色设备量展示
 
 ### 修复
-- fix:修复IP地址错误问题 feat:设备绑定自动应用默认设置
+- fix(stt.aliyun): do not reuse recognizer
+- fix(stt.aliyun): support long speech recognition
+- fix: memory leak. Should clean up dialogue info after session closed
 
 ### 其他变更
-- chore: update version to 2.7.23 [skip ci]
-- docs: update changelog for v2.7.22 [skip ci]
-- chore: update version to 2.7.22 [skip ci]
-- docs: update changelog for v2.7.22 [skip ci]
-- chore: update version to 2.7.22 [skip ci]
-## [2.7.21] - 2025-04-24
+- chore: update version to 2.8.0 [skip ci]
+- update:角色返回增加modelName
+- docs: update changelog for v2.7.68 [skip ci]
+- chore: update version to 2.7.68 [skip ci]
+- docs: update changelog for v2.7.67 [skip ci]
+- chore: update version to 2.7.67 [skip ci]
+- docs: update changelog for v2.7.66 [skip ci]
+- chore: update version to 2.7.66 [skip ci]
+- refactor(stt): simplify SttServiceFactory
 
-## [2.7.20] - 2025-04-24
+## [2.7.68] - 2025-06-14
+
+### 修复
+- fix(stt.aliyun): do not reuse recognizer
+- fix(stt.aliyun): support long speech recognition
+- fix: memory leak. Should clean up dialogue info after session closed
+
+### 其他变更
+- chore: update version to 2.7.68 [skip ci]
+- docs: update changelog for v2.7.67 [skip ci]
+- chore: update version to 2.7.67 [skip ci]
+- docs: update changelog for v2.7.66 [skip ci]
+- chore: update version to 2.7.66 [skip ci]
+- refactor(stt): simplify SttServiceFactory
+
+## [2.7.67] - 2025-06-14
+
+### 修复
+- fix: memory leak. Should clean up dialogue info after session closed
+
+### 其他变更
+- chore: update version to 2.7.67 [skip ci]
+- docs: update changelog for v2.7.66 [skip ci]
+- chore: update version to 2.7.66 [skip ci]
+
+## [2.7.66] - 2025-06-14
+
+### 其他变更
+- chore: update version to 2.7.66 [skip ci]
+
+## [2.7.65] - 2025-06-12
+
+### 其他变更
+- chore: update version to 2.7.65 [skip ci]
+
+## [2.7.64] - 2025-06-12
+
+### 修复
+- Merge pull request #98 from vritser/main
+- fix(audio): merge audio files
+
+### 其他变更
+- chore: update version to 2.7.64 [skip ci]
+- docs: update changelog for v2.7.63 [skip ci]
+- chore: update version to 2.7.63 [skip ci]
+
+## [2.7.63] - 2025-06-12
+
+### 其他变更
+- chore: update version to 2.7.63 [skip ci]
+
+## [2.7.62] - 2025-06-11
+
+### 其他变更
+- chore: update version to 2.7.62 [skip ci]
+
+## [2.7.61] - 2025-06-11
+
+### 其他变更
+- chore: update version to 2.7.61 [skip ci]
+
+## [2.7.60] - 2025-06-11
+
+### 新功能
+- Merge pull request #96 from vritser/main
+- feat(tts): support minimax t2a
+
+### 修复
+- fix:修复阿里语音合成多余参数，删除
+- fix(tts): tts service factory
+
+### 其他变更
+- chore: update version to 2.7.60 [skip ci]
+- docs: update changelog for v2.7.59 [skip ci]
+- chore: update version to 2.7.59 [skip ci]
+- refactor(tts): add default implements
+- docs: update changelog for v2.7.58 [skip ci]
+- chore: update version to 2.7.58 [skip ci]
+
+## [2.7.59] - 2025-06-11
+
+### 新功能
+- Merge pull request #96 from vritser/main
+- feat(tts): support minimax t2a
+
+### 修复
+- fix(tts): tts service factory
+
+### 其他变更
+- chore: update version to 2.7.59 [skip ci]
+- refactor(tts): add default implements
+- docs: update changelog for v2.7.58 [skip ci]
+- chore: update version to 2.7.58 [skip ci]
+
+## [2.7.58] - 2025-06-09
+
+### 其他变更
+- chore: update version to 2.7.58 [skip ci]
+
+## [2.7.57] - 2025-06-09
 
 
-## [2.7.19] - 2025-04-24
+## [2.7.56] - 2025-06-09
 

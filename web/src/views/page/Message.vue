@@ -49,7 +49,7 @@
               </a-tooltip>
             </templace>
             <template slot="audioPath" slot-scope="text, record">
-              <div v-if="text && text.trim()">
+              <div v-if="text && text.trim()" class="audio-player-container">
                 <audio-player :audio-url="text" />
               </div>
               <span v-else>无音频</span>
@@ -174,7 +174,7 @@ export default {
           title: "对话时间",
           dataIndex: "createTime",
           scopedSlots: { customRender: "createTime" },
-          width: 180,
+          width: 150,
           align: "center",
         },
         {
@@ -221,11 +221,11 @@ export default {
             this.data = res.data.list;
             this.pagination.total = res.data.total;
           } else {
-            this.$message.error(res.message);
+            this.showError(res.message);
           }
         })
         .catch(() => {
-          this.$message.error("服务器维护/重启中,请稍后再试");
+          this.showError();
         })
         .finally(() => {
           this.loading = false
@@ -246,11 +246,11 @@ export default {
             this.$message.success("删除成功");
             this.getData();
           } else {
-            this.$message.error(res.message);
+            this.showError(res.message);
           }
         })
         .catch(() => {
-          this.$message.error("服务器维护/重启中,请稍后再试");
+          this.showError();
         })
         .finally(() => {
           this.loading = false;
@@ -259,3 +259,11 @@ export default {
   },
 };
 </script>
+<style scoped>
+.audio-player-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  z-index: 1; /* 确保不会超过固定列 */
+}
+</style>

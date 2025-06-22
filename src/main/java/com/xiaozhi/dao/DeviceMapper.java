@@ -1,8 +1,8 @@
 package com.xiaozhi.dao;
 
-import java.util.List;
-
 import com.xiaozhi.entity.SysDevice;
+
+import java.util.List;
 
 /**
  * 设备信息 数据层
@@ -12,6 +12,8 @@ import com.xiaozhi.entity.SysDevice;
  */
 public interface DeviceMapper {
   List<SysDevice> query(SysDevice device);
+
+  SysDevice selectDeviceById(String deviceId);
 
   int generateCode(SysDevice device);
 
@@ -24,4 +26,6 @@ public interface DeviceMapper {
   int add(SysDevice device);
 
   int delete(SysDevice device);
+
+  int insertCode(String deviceId, String code);
 }

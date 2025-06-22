@@ -1,8 +1,8 @@
 package com.xiaozhi.common.web;
 
-import java.util.HashMap;
-
 import org.springframework.util.ObjectUtils;
+
+import java.util.HashMap;
 
 /**
  * API返回封装
@@ -143,5 +143,17 @@ public class AjaxResult extends HashMap<String, Object> {
      */
     public static AjaxResult error(int code, String msg, Object data) {
         return new AjaxResult(code, msg, data);
+    }
+
+    public int getCode() {
+        return (int) super.get(CODE_TAG);
+    }
+
+    public String getMessage() {
+        return (String) super.get(MSG_TAG);
+    }
+
+    public Object getData() {
+        return super.get(DATA_TAG);
     }
 }

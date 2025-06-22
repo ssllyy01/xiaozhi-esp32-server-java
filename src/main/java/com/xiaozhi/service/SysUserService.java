@@ -1,10 +1,11 @@
 package com.xiaozhi.service;
 
-import java.util.List;
-
 import com.xiaozhi.common.exception.UserPasswordNotMatchException;
 import com.xiaozhi.common.exception.UsernameNotFoundException;
+import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.entity.SysUser;
+
+import java.util.List;
 
 /**
  * 用户操作
@@ -26,7 +27,7 @@ public interface SysUserService {
      * @param password
      * @return
      */
-    public SysUser login(String username, String password)
+    SysUser login(String username, String password)
             throws UsernameNotFoundException, UserPasswordNotMatchException;
 
     /**
@@ -35,7 +36,7 @@ public interface SysUserService {
      * @param username
      * @return 用户信息
      */
-    public SysUser query(String username);
+    SysUser query(String username);
 
     /**
      * 用户查询列表
@@ -43,13 +44,13 @@ public interface SysUserService {
      * @param user
      * @return 用户列表
      */
-    public List<SysUser> queryUsers(SysUser user);
+    List<SysUser> queryUsers(SysUser user, PageFilter pageFilter);
 
-    public SysUser selectUserByUserId(Integer userId);
+    SysUser selectUserByUserId(Integer userId);
 
-    public SysUser selectUserByUsername(String username);
+    SysUser selectUserByUsername(String username);
 
-    public SysUser selectUserByEmail(String email);
+    SysUser selectUserByEmail(String email);
 
     /**
      * 新增用户
@@ -57,7 +58,7 @@ public interface SysUserService {
      * @param user
      * @return
      */
-    public int add(SysUser user);
+    int add(SysUser user);
 
     /**
      * 修改用户信息
@@ -65,13 +66,13 @@ public interface SysUserService {
      * @param user
      * @return
      */
-    public int update(SysUser user);
+    int update(SysUser user);
 
     /**
      * 生成验证码
      * 
      */
-    public SysUser generateCode(SysUser user);
+    SysUser generateCode(SysUser user);
 
     /**
      * 查询验证码是否有效
@@ -80,6 +81,6 @@ public interface SysUserService {
      * @param email
      * @return
      */
-    public int queryCaptcha(String code, String email);
+    int queryCaptcha(String code, String email);
 
 }

@@ -10,6 +10,10 @@ axios.defaults.withCredentials = true;
 // 创建一个工具函数，用于处理静态资源URL
 export const getResourceUrl = (path) => {
   if (!path) return '';
+
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
   
   // 确保URL以/开头
   if (!path.startsWith('/')) {

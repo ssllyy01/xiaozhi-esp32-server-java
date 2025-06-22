@@ -2,47 +2,51 @@ package com.xiaozhi.common.web;
 
 import java.io.Serializable;
 
-import org.springframework.stereotype.Service;
-import org.springframework.web.server.ServerWebExchange;
-import org.springframework.web.server.WebSession;
 
-import reactor.core.publisher.Mono;
+
+import org.springframework.stereotype.Service;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 /**
- * WebFlux会话提供类
+ * HttpSession提供类
  */
 @Service
 public class HttpSessionProvider implements SessionProvider {
 
-    @Override
-    public Mono<Serializable> getAttribute(ServerWebExchange exchange, String name) {
-        return exchange.getSession()
-                .map(session -> (Serializable) session.getAttribute(name));
-    }
+	public Serializable getAttribute(HttpServletRequest request, String name) {
+		HttpSession session = request.getSession(false);
+		if (session != null) {
+			return (Serializable) session.getAttribute(name);
+		} else {
+			return null;
+		}
+	}
+
+	public void setAttribute(HttpServletRequest request, HttpServletResponse response, String name,
+			Serializable value) {
+		System.out.println(name);
+		HttpSession session = request.getSession();
+		session.setAttribute(name, value);
+	}
+
+	public String getSessionId(HttpServletRequest request, HttpServletResponse response) {
+		return request.getSession().getId();
+	}
+
+	public void logout(HttpServletRequest request, HttpServletResponse response) {
+		HttpSession session = request.getSession(false);
+		if (session != null) {
+			session.invalidate();
+		}
+	}
 
     @Override
-    public Mono<Void> setAttribute(ServerWebExchange exchange, String name, Serializable value) {
-        return exchange.getSession()
-                .doOnNext(session -> session.getAttributes().put(name, value))
-                .then();
-    }
+	public void removeAttribute(HttpServletRequest request, String name) {
+		HttpSession session = request.getSession();
+		session.removeAttribute(name);
+	}
 
-    @Override
-    public Mono<String> getSessionId(ServerWebExchange exchange) {
-        return exchange.getSession()
-                .map(WebSession::getId);
-    }
-
-    @Override
-    public Mono<Void> logout(ServerWebExchange exchange) {
-        return exchange.getSession()
-                .flatMap(WebSession::invalidate);
-    }
-
-    @Override
-    public Mono<Void> removeAttribute(ServerWebExchange exchange, String name) {
-        return exchange.getSession()
-                .doOnNext(session -> session.getAttributes().remove(name))
-                .then();
-    }
 }

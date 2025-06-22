@@ -3,58 +3,54 @@
 <mapper namespace="com.xiaozhi.dao.DeviceMapper">
 
     <sql id="deviceSql">
-        sys_device.deviceId, sys_device.deviceName, sys_device.ip, sys_device.wifiName, sys_device.chipModelName, sys_device.version, sys_device.state, sys_device.userId, sys_device.lastLogin, sys_device.createTime
+        sys_device.deviceId, sys_device.deviceName, sys_device.ip, sys_device.wifiName,
+        sys_device.chipModelName, sys_device.type, sys_device.version, sys_device.state,
+        sys_device.roleId, sys_device.userId, sys_device.lastLogin, sys_device.createTime
     </sql>
 
     <sql id="roleSql">
-        sys_role.roleId, sys_role.roleName, sys_role.roleDesc, sys_role.voiceName
-    </sql>
-
-    <sql id="modelSql">
-        model_config.configId AS modelId
-    </sql>
-
-    <sql id="sttSql">
-        stt_config.configId AS sttId
-    </sql>
-
-    <sql id="ttsSql">
-        tts_config.configId AS ttsId
+        sys_role.roleName, sys_role.roleDesc, sys_role.voiceName,
+        sys_role.modelId, sys_role.sttId, sys_role.ttsId,
+        sys_role.vadSpeechTh, sys_role.vadSilenceTh, sys_role.vadEnergyTh, sys_role.vadSilenceMs
     </sql>
 
     <select id="query" resultType="com.xiaozhi.entity.SysDevice">
         SELECT
         <include refid="deviceSql"></include>,
         <include refid="roleSql"></include>,
-        <include refid="modelSql"></include>,
-        <include refid="sttSql"></include>,
-        <include refid="ttsSql"></include>,
         (SELECT COUNT(*) FROM sys_message WHERE sys_message.deviceId = sys_device.deviceId AND sys_message.state = '1') AS totalMessage
         FROM
             sys_device
             LEFT JOIN sys_role ON sys_device.roleId = sys_role.roleId
-            LEFT JOIN sys_config model_config ON sys_device.modelId = model_config.configId AND model_config.configType = 'llm'
-            LEFT JOIN sys_config stt_config ON sys_device.sttId = stt_config.configId AND stt_config.configType = 'stt'
-            LEFT JOIN sys_config tts_config ON ttsId = tts_config.configId AND tts_config.configType = 'tts'
         WHERE
             1 = 1
             <if test="userId != null and userId != ''">AND sys_device.userId = #{userId}</if>
             <if test="deviceId != null and deviceId != ''">AND deviceId = #{deviceId}</if>
             <if test="deviceName != null and deviceName != ''">AND deviceName LIKE CONCAT('%', #{deviceName}, '%')</if>
+            <if test="roleName != null and roleName != ''">AND roleName LIKE CONCAT('%', #{roleName}, '%')</if>
             <if test="state != null and state != ''">AND sys_device.state = #{state}</if>
+    </select>
+
+    <select id="selectDeviceById" resultType="com.xiaozhi.entity.SysDevice">
+        SELECT
+            <include refid="deviceSql"></include>
+        FROM
+            sys_device
+        WHERE
+            deviceId = #{deviceId}
     </select>
 
     <select id="queryVerifyCode" parameterType="com.xiaozhi.entity.SysDevice" resultType="com.xiaozhi.entity.SysDevice">
         SELECT
-            code, audioPath, deviceId
+            code, audioPath, deviceId, type
         FROM
             sys_code
         WHERE
             1 = 1
             <if test="deviceId != null and deviceId != ''">AND deviceId = #{deviceId}</if>
             <if test="sessionId != null and sessionId != ''">AND sessionId = #{sessionId}</if>
-            <if test="code != null and code != ''">AND code = #{code}</if>
-            AND createTime &gt;= DATE_SUB(NOW(),INTERVAL 10 MINUTE)
+            <if test="createTime != null">AND createTime &gt;= #{createTime}</if>
+            <if test="createTime == null">AND createTime &gt;= DATE_SUB(NOW(),INTERVAL 10 MINUTE)</if>
             ORDER BY createTime DESC
         LIMIT 1
     </select>
@@ -74,8 +70,13 @@
         <selectKey keyProperty="code" order="BEFORE" resultType="java.lang.String">
             SELECT LPAD(FLOOR(RAND() * 1000000), 6, '0') as code
         </selectKey>
-        INSERT INTO sys_code (deviceId, sessionId, code, createTime)
-        VALUES (#{deviceId}, #{sessionId}, #{code}, NOW())
+        INSERT INTO sys_code (deviceId, sessionId, type, code, createTime)
+        VALUES (#{deviceId}, #{sessionId}, #{type}, #{code}, NOW())
+    </insert>
+
+    <insert id="insertCode">
+        INSERT INTO sys_code (deviceId, type, code, createTime)
+        VALUES (#{deviceId}, 'access_token', #{code}, NOW())
     </insert>
 
     <update id="update" parameterType="com.xiaozhi.entity.SysDevice">
@@ -86,25 +87,25 @@
             <if test="deviceName != null and deviceName != ''">deviceName = #{deviceName},</if>
             <if test="wifiName != null and wifiName != ''">wifiName = #{wifiName},</if>
             <if test="chipModelName != null and chipModelName != ''">chipModelName = #{chipModelName},</if>
+            <if test="type != null and type != ''">type = #{type},</if>
             <if test="version != null and version != ''">version = #{version},</if>
             <if test="ip != null and ip != ''">ip = #{ip},</if>
             <if test="lastLogin != null and lastLogin != ''">lastLogin = NOW(),</if>
-            <if test="modelId != null and modelId != ''">modelId = #{modelId},</if>
-            <if test="sttId != null and sttId != ''">
-                <choose>
-                    <when test="sttId == -1">sttId = null,</when>
-                    <otherwise>sttId = #{sttId},</otherwise>
-                </choose>
-            </if>
             <if test="roleId != null and roleId != ''">roleId = #{roleId},</if>
         </set>
         WHERE
-            deviceId = #{deviceId}
+            1 = 1
+            <if test="userId != null and userId != ''">AND userId = #{userId}</if>
+            AND deviceId = #{deviceId}
     </update>
 
     <insert id="add" useGeneratedKeys="true" keyProperty="deviceName" parameterType="com.xiaozhi.entity.SysDevice">
-        INSERT INTO sys_device ( deviceId, deviceName, userId, modelId, sttId, roleId ) VALUES (
-            #{deviceId}, #{deviceName}, #{userId}, #{modelId}, #{sttId}, #{roleId}
+        INSERT INTO sys_device (deviceId, deviceName, type, userId, roleId) VALUES (
+            #{deviceId},
+            #{deviceName},
+            #{type},
+            #{userId},
+            #{roleId}
         )
     </insert>
 

@@ -1,8 +1,9 @@
 package com.xiaozhi.service;
 
-import java.util.List;
-
+import com.xiaozhi.common.web.PageFilter;
 import com.xiaozhi.entity.SysRole;
+
+import java.util.List;
 
 /**
  * 角色查询/更新
@@ -18,15 +19,16 @@ public interface SysRoleService {
    * @param role
    * @return
    */
-  public int add(SysRole role);
+  int add(SysRole role);
 
   /**
    * 查询角色信息
-   * 
+   * 指定分页信息
    * @param role
+   * @param pageFilter
    * @return
    */
-  public List<SysRole> query(SysRole role);
+  List<SysRole> query(SysRole role, PageFilter pageFilter);
 
   /**
    * 更新角色信息
@@ -34,8 +36,8 @@ public interface SysRoleService {
    * @param role
    * @return
    */
-  public int update(SysRole role);
+  int update(SysRole role);
 
-  public SysRole selectRoleById(Integer roleId);
+  SysRole selectRoleById(Integer roleId);
 
 }
